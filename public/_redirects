@@ -1,2 +1,3 @@
-# Cloudflare Pages / Netlify SPA fallback routing
-/*    /index.html   200
+# Cloudflare Pages SPA fallback routing
+# Using "/" as destination avoids Clean URLs .html stripping infinite loop
+/* / 200
