@@ -73,6 +73,9 @@ export interface Task {
   assignee_id?: string | null;
   assignee_name?: string;
   assignee_avatar?: string;
+  plan_name?: string;
+  plan_color?: string;
+  plan_icon?: string;
   created_by: string;
   sort_order: number;
   created_at: string;
@@ -92,6 +95,9 @@ export interface Milestone {
   totalTasks?: number;
   completedTasks?: number;
   taskProgress?: number;
+  plan_name?: string;
+  plan_color?: string;
+  plan_icon?: string;
 }
 
 export interface BudgetItem {

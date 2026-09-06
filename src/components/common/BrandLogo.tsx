@@ -59,11 +59,11 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
       {activeLogoUrl && !imgFailed ? (
         <div
           className={`bg-white border-2 border-black shrink-0 group-hover:scale-105 transition-transform flex items-center justify-center overflow-hidden ${customImgContainerClasses}`}
-          title="PlanCraft"
+          title="RencanaKu"
         >
           <img
             src={activeLogoUrl}
-            alt="PlanCraft Logo"
+            alt="RencanaKu Logo"
             onError={() => setImgFailed(true)}
             className="w-full h-full object-contain"
           />
@@ -71,9 +71,9 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
       ) : (
         <div
           className={`bg-black border-2 border-black grid grid-cols-2 grid-rows-2 shrink-0 group-hover:scale-105 transition-transform ${iconSizeClasses}`}
-          title="PlanCraft"
+          title="RencanaKu"
         >
-          {/* Cell 1: PlanCraft Monogram (Chartreuse Accent) */}
+          {/* Cell 1: RencanaKu Monogram (Chartreuse Accent) */}
           <div className="bg-[#E0FF62] border border-black rounded-[3px] sm:rounded-[4px] flex items-center justify-center overflow-hidden">
             <span className="font-black text-[10px] sm:text-xs md:text-sm text-black font-mono leading-none">
               P
@@ -101,12 +101,12 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
             <span
               className={`font-black tracking-tight uppercase text-black truncate leading-none ${fontSizeClasses}`}
             >
-              PLAN
+              RENCANA
             </span>
             <span
               className={`bg-[#E0FF62] text-black border-2 border-black font-black uppercase tracking-wider leading-none shrink-0 ${kuBadgeClasses}`}
             >
-              CRAFT
+              KU
             </span>
             <span className="hidden md:inline-block text-[8px] font-black uppercase tracking-[0.2em] px-1.5 py-0.5 bg-white text-black border border-black rounded-full shadow-[1px_1px_0px_0px_rgba(0,0,0,1)] ml-1">
               OS

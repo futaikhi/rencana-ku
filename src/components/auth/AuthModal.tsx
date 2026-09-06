@@ -28,7 +28,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
     try {
       if (isRegister) {
         await register({ name, email, password, bio });
-        showSuccess(`Welcome to PlanCraft, ${name}!`, "Account Created");
+        showSuccess(`Welcome to RencanaKu, ${name}!`, "Account Created");
       } else {
         await login(email, password);
         showSuccess("Signed in successfully!", "Welcome Back");
@@ -47,7 +47,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={isRegister ? "Create PlanCraft Account" : "Sign In to PlanCraft"}
+      title={isRegister ? "Create RencanaKu Account" : "Sign In to RencanaKu"}
       subtitle={
         isRegister
           ? "Start executing your goals and managing life plans in structured bento blocks."

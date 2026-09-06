@@ -4,7 +4,7 @@ import path from "path";
 import bcrypt from "bcryptjs";
 
 const DATA_DIR = path.join(process.cwd(), "data");
-const DB_FILE = path.join(DATA_DIR, "plancraft.sqlite");
+const DB_FILE = path.join(DATA_DIR, "rencanaku.sqlite");
 
 let dbInstance: SqlJsDatabase | null = null;
 
@@ -210,7 +210,7 @@ function seedInitialData(db: SqlJsDatabase) {
     return;
   }
 
-  console.log("Seeding initial demo data for PlanCraft (2 Users: User One & User Two)...");
+  console.log("Seeding initial demo data for RencanaKu (2 Users: User One & User Two)...");
 
   const hash = bcrypt.hashSync("password123", 10);
   const now = new Date().toISOString();
@@ -222,8 +222,8 @@ function seedInitialData(db: SqlJsDatabase) {
   execute(`
     INSERT INTO users (id, name, email, password_hash, avatar_url, bio, created_at)
     VALUES 
-      (?, 'User One', 'user1@plancraft.app', ?, 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80', 'Primary Planner (Demo 1)', ?),
-      (?, 'User Two', 'user2@plancraft.app', ?, 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80', 'Collaborator (Demo 2)', ?);
+      (?, 'User One', 'user1@rencanaku.app', ?, 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80', 'Primary Planner (Demo 1)', ?),
+      (?, 'User Two', 'user2@rencanaku.app', ?, 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80', 'Collaborator (Demo 2)', ?);
   `, [user1Id, hash, now, user2Id, hash, now]);
 
   // 2. Plan 1: Wedding (💍) - Owned by User One, Collaborator: User Two (Editor)
@@ -497,11 +497,11 @@ function seedInitialData(db: SqlJsDatabase) {
     studyId, msS3, user1Id, user1Id, now, now,
   ]);
 
-  // 6. Pending Invitation: User Two invites User One to "Launch PlanCraft SaaS"
+  // 6. Pending Invitation: User Two invites User One to "Launch RencanaKu SaaS"
   const saasId = "plan_saas_05";
   execute(`
     INSERT INTO plans (id, owner_id, name, description, category, icon, color, target_date, budget_enabled, budget_target, notes, created_at, updated_at)
-    VALUES (?, ?, 'Launch PlanCraft SaaS', 'Build, polish, and launch our multi-user collaborative life planning web application.', 'Business', 'Rocket', '#0F766E', '2026-11-30', 1, 25000000,
+    VALUES (?, ?, 'Launch RencanaKu SaaS', 'Build, polish, and launch our multi-user collaborative life planning web application.', 'Business', 'Rocket', '#0F766E', '2026-11-30', 1, 25000000,
     'Core MVP Scope:
 - Multi-user authentication & secure isolation
 - Real-time plan progress computation

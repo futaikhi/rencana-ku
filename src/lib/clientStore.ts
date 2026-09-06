@@ -12,7 +12,7 @@ import {
   PlanStats,
 } from "../types";
 
-const STORAGE_KEY = "plancraft_local_state_v1";
+const STORAGE_KEY = "rencanaku_local_state_v1";
 
 interface StoredMember extends PlanMember {
   plan_id: string;
@@ -33,7 +33,7 @@ const INITIAL_USERS: (User & { password?: string })[] = [
   {
     id: "user_one_01",
     name: "User One",
-    email: "user1@plancraft.app",
+    email: "user1@rencanaku.app",
     password: "password123",
     avatar_url:
       "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
@@ -42,7 +42,7 @@ const INITIAL_USERS: (User & { password?: string })[] = [
   {
     id: "user_two_02",
     name: "User Two",
-    email: "user2@plancraft.app",
+    email: "user2@rencanaku.app",
     password: "password123",
     avatar_url:
       "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80",
@@ -173,7 +173,7 @@ const INITIAL_MEMBERS: StoredMember[] = [
     role: "OWNER",
     joined_at: new Date().toISOString(),
     name: "User One",
-    email: "user1@plancraft.app",
+    email: "user1@rencanaku.app",
     avatar_url: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
     bio: "Primary Planner (Demo 1)",
   },
@@ -184,7 +184,7 @@ const INITIAL_MEMBERS: StoredMember[] = [
     role: "EDITOR",
     joined_at: new Date().toISOString(),
     name: "User Two",
-    email: "user2@plancraft.app",
+    email: "user2@rencanaku.app",
     avatar_url: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80",
     bio: "Collaborator (Demo 2)",
   },
@@ -195,7 +195,7 @@ const INITIAL_MEMBERS: StoredMember[] = [
     role: "OWNER",
     joined_at: new Date().toISOString(),
     name: "User One",
-    email: "user1@plancraft.app",
+    email: "user1@rencanaku.app",
     avatar_url: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
   },
   {
@@ -205,7 +205,7 @@ const INITIAL_MEMBERS: StoredMember[] = [
     role: "OWNER",
     joined_at: new Date().toISOString(),
     name: "User Two",
-    email: "user2@plancraft.app",
+    email: "user2@rencanaku.app",
     avatar_url: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80",
   },
   {
@@ -215,7 +215,7 @@ const INITIAL_MEMBERS: StoredMember[] = [
     role: "EDITOR",
     joined_at: new Date().toISOString(),
     name: "User One",
-    email: "user1@plancraft.app",
+    email: "user1@rencanaku.app",
     avatar_url: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
   },
   {
@@ -225,7 +225,7 @@ const INITIAL_MEMBERS: StoredMember[] = [
     role: "OWNER",
     joined_at: new Date().toISOString(),
     name: "User One",
-    email: "user1@plancraft.app",
+    email: "user1@rencanaku.app",
     avatar_url: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
   },
 ];
@@ -360,14 +360,14 @@ const INITIAL_INVITATIONS: PlanInvitation[] = [
     role: "EDITOR",
     status: "PENDING",
     created_at: new Date().toISOString(),
-    plan_name: "Launch PlanCraft SaaS",
+    plan_name: "Launch RencanaKu SaaS",
     plan_icon: "Rocket",
     plan_color: "#0F766E",
     inviter_name: "User Two",
-    inviter_email: "user2@plancraft.app",
+    inviter_email: "user2@rencanaku.app",
     inviter_avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80",
     invitee_name: "User One",
-    invitee_email: "user1@plancraft.app",
+    invitee_email: "user1@rencanaku.app",
   },
 ];
 
@@ -511,7 +511,7 @@ export const clientStore = {
       name: data.name,
       email: data.email,
       password: data.password,
-      bio: data.bio || "PlanCraft Explorer",
+      bio: data.bio || "RencanaKu Explorer",
       avatar_url: `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(data.name)}`,
     };
     state.users.push(newUser);
@@ -563,12 +563,27 @@ export const clientStore = {
       (inv) => inv.invitee_id === userId && inv.status === "PENDING"
     );
     const userPlanIds = [...myPlans.map((p) => p.id), ...sharedPlans.map((p) => p.id)];
+
+    const userPlansMap = new Map(state.plans.filter((p) => userPlanIds.includes(p.id)).map((p) => [p.id, p]));
+
     const upcomingTasks = state.tasks
       .filter((t) => userPlanIds.includes(t.plan_id) && t.status !== "COMPLETED")
-      .slice(0, 10);
+      .slice(0, 10)
+      .map((t) => ({
+        ...t,
+        plan_name: userPlansMap.get(t.plan_id)?.name || undefined,
+        plan_color: userPlansMap.get(t.plan_id)?.color || undefined,
+        plan_icon: userPlansMap.get(t.plan_id)?.icon || undefined,
+      }));
     const upcomingMilestones = state.milestones
       .filter((m) => userPlanIds.includes(m.plan_id) && m.status !== "COMPLETED")
-      .slice(0, 5);
+      .slice(0, 5)
+      .map((m) => ({
+        ...m,
+        plan_name: userPlansMap.get(m.plan_id)?.name || undefined,
+        plan_color: userPlansMap.get(m.plan_id)?.color || undefined,
+        plan_icon: userPlansMap.get(m.plan_id)?.icon || undefined,
+      }));
 
     // Attach stats
     for (const p of myPlans) {

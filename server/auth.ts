@@ -3,7 +3,7 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import { queryOne } from "./db.js";
 
-const JWT_SECRET = process.env.JWT_SECRET || "plancraft-super-secure-jwt-secret-key";
+const JWT_SECRET = process.env.JWT_SECRET || "rencanaku-super-secure-jwt-secret-key";
 
 export interface AuthenticatedUser {
   id: string;

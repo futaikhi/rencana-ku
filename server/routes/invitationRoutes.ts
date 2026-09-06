@@ -56,7 +56,7 @@ router.post("/plans/:planId", authenticateToken, (req: AuthRequest, res: Respons
     }
 
     if (!invitee) {
-      return res.status(404).json({ error: "User not found. Ensure the user has registered on PlanCraft first." });
+      return res.status(404).json({ error: "User not found. Ensure the user has registered on RencanaKu first." });
     }
 
     if (invitee.id === inviterId) {

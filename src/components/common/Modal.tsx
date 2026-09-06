@@ -66,7 +66,7 @@ export const Modal: React.FC<ModalProps> = ({
             <div className="flex items-start justify-between px-6 py-5 border-b-2 border-black bg-[#F0F0F0]">
               <div>
                 <span className="text-[10px] font-black uppercase tracking-[0.2em] opacity-40 block mb-0.5">
-                  PlanCraft Bento Node
+                  RencanaKu Bento Node
                 </span>
                 <h3 className="text-xl font-black text-black tracking-tight uppercase">{title}</h3>
                 {subtitle && <p className="text-xs text-black/60 font-medium mt-0.5">{subtitle}</p>}

@@ -17,7 +17,7 @@ async function startServer() {
   await getDb();
 
   const app = express();
-  const PORT = 3000;
+  const PORT = 3010;
 
   // JSON Body Parser
   app.use(express.json({ limit: "10mb" }));
@@ -25,7 +25,7 @@ async function startServer() {
 
   // API Routes
   app.get("/api/health", (_req, res) => {
-    res.json({ status: "ok", app: "PlanCraft API", time: new Date().toISOString() });
+    res.json({ status: "ok", app: "RencanaKu API", time: new Date().toISOString() });
   });
 
   app.use("/api/auth", authRoutes);
@@ -60,7 +60,7 @@ async function startServer() {
   }
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`PlanCraft server running on http://0.0.0.0:${PORT}`);
+    console.log(`RencanaKu server running on http://0.0.0.0:${PORT}`);
   });
 }
 

@@ -383,7 +383,7 @@ export const LandingView: React.FC<LandingViewProps> = () => {
                 disabled={loading}
                 className="w-full mt-2 py-3 bg-[#E0FF62] hover:bg-[#d4f745] disabled:opacity-50 text-xs sm:text-sm font-black uppercase tracking-wider text-black border-2 border-black rounded-2xl shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:translate-x-0.5 active:translate-y-0.5 transition-all flex items-center justify-center space-x-2"
               >
-                <span>{loading ? "Processing..." : authMode === "register" ? "Create Free Account" : "Sign In to PlanCraft"}</span>
+                <span>{loading ? "Processing..." : authMode === "register" ? "Create Free Account" : "Sign In to RencanaKu"}</span>
                 <ArrowRight size={16} className="stroke-[2.5]" />
               </button>
 
@@ -409,7 +409,7 @@ export const LandingView: React.FC<LandingViewProps> = () => {
           <div className="flex items-center space-x-2.5">
             <BrandLogo size="sm" showWordmark={false} />
             <p className="text-xs font-black uppercase tracking-wider text-black">
-              PlanCraft Mobile PWA • Real-time Collaboration
+              RencanaKu Mobile PWA • Real-time Collaboration
             </p>
           </div>
           <p className="text-xs text-black/60 font-medium">
