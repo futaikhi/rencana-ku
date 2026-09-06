@@ -46,7 +46,7 @@ export interface Plan {
   category: string;
   icon?: string;
   color?: string;
-  target_date?: string;
+  target_date?: string | null;
   budget_enabled: boolean;
   budget_target?: number;
   notes?: string;

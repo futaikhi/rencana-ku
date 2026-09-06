@@ -156,7 +156,7 @@ export default function App() {
     category?: string;
     icon?: string;
     color?: string;
-    target_date?: string | "";
+    target_date?: string | "" | null;
     budget_enabled?: boolean;
     budget_target?: number;
     initialMilestones?: string[];
