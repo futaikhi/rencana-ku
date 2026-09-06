@@ -1,0 +1,6 @@
+{
+  "name": "PlanCraft",
+  "description": "Bento-style collaborative life planning, milestone tracking, and goal execution platform.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
