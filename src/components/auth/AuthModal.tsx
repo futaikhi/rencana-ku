@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Modal } from "../common/Modal";
 import { useAuth } from "../../context/AuthContext";
 import { useToast } from "../../context/ToastContext";
-import { LogIn, UserPlus, AlertCircle, ArrowRight } from "lucide-react";
+import { LogIn, UserPlus, AlertCircle, ArrowRight, Chrome, Apple } from "lucide-react";
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -81,6 +81,41 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                 <span className="text-[10px] opacity-60">({u.email.split("@")[0]})</span>
               </button>
             ))}
+          </div>
+        </div>
+
+        {/* OAuth Login Buttons */}
+        <div className="mb-4 space-y-2">
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-black/20"></div>
+            </div>
+            <div className="relative flex items-center justify-center">
+              <span className="text-[10px] font-black uppercase tracking-wider text-black/40 bg-white px-2">or sign in with</span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                window.location.href = "/api/auth/oauth/google";
+              }}
+              className="flex items-center justify-center space-x-1.5 py-2.5 bg-white hover:bg-[#F0F0F0] text-black text-xs font-black uppercase tracking-wider rounded-xl border-2 border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-x-0.5 active:translate-y-0.5 transition-all"
+            >
+              <Chrome size={14} className="stroke-[2.5]" />
+              <span>Google</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                window.location.href = "/api/auth/oauth/apple";
+              }}
+              className="flex items-center justify-center space-x-1.5 py-2.5 bg-black hover:bg-[#222] text-white text-xs font-black uppercase tracking-wider rounded-xl border-2 border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-x-0.5 active:translate-y-0.5 transition-all"
+            >
+              <Apple size={14} className="stroke-[2.5] fill-current" />
+              <span>Apple</span>
+            </button>
           </div>
         </div>
 
