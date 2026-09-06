@@ -1,4 +1,1 @@
-# Cloudflare Pages SPA fallback routing
-# 404 fallback ensures static assets are served normally (correct MIME types)
-# while client-side routes fall back to index.html
-/* /index.html 404
+/* /index.html 200
