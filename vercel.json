@@ -6,8 +6,7 @@
   "rewrites": [
     {
       "source": "/(.*)",
-      "destination": "/index.html",
-      "status": 404
+      "destination": "/index.html"
     }
   ]
 }
