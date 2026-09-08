@@ -11,6 +11,7 @@ import notesRoutes from "./server/routes/notesRoutes.js";
 import memberRoutes from "./server/routes/memberRoutes.js";
 import invitationRoutes from "./server/routes/invitationRoutes.js";
 import activityRoutes from "./server/routes/activityRoutes.js";
+import syncRoutes from "./server/routes/syncRoutes.js";
 
 async function startServer() {
   // Initialize SQLite database
@@ -37,6 +38,7 @@ async function startServer() {
   app.use("/api/plans", memberRoutes);
   app.use("/api/invitations", invitationRoutes);
   app.use("/api/activity", activityRoutes);
+  app.use("/api/sync", syncRoutes);
 
   // Global Error Handler for API
   app.use("/api", (err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

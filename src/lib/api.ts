@@ -10,6 +10,7 @@ import {
   PlanMember,
 } from "../types";
 import { clientStore } from "./clientStore";
+import { syncService } from "./syncService";
 
 const TOKEN_KEY = "plancraft_token";
 const CURRENT_USER_ID_KEY = "plancraft_current_user_id";
@@ -97,14 +98,13 @@ async function request<T>(
 
     return data as T;
   } catch (err: any) {
-    // If network failed (e.g. backend offline or static deployment)
+    // If network failed (e.g. device offline, timeout, or backend temporarily unreachable)
     if (
       fallbackFn &&
       (err.message?.includes("Failed to fetch") ||
         err.message?.includes("NetworkError") ||
         err.name === "TypeError")
     ) {
-      isStaticMode = true;
       return fallbackFn();
     }
     throw err;
@@ -238,7 +238,15 @@ export const api = {
         method: "POST",
         body: JSON.stringify(data),
       },
-      () => clientStore.createPlan(getCurrentUserId(), data)
+      () => {
+        const res = clientStore.createPlan(getCurrentUserId(), data);
+        syncService.enqueueMutation({
+          type: "CREATE_PLAN",
+          entityId: res.plan.id,
+          payload: { ...res.plan },
+        });
+        return res;
+      }
     );
   },
 
@@ -257,7 +265,16 @@ export const api = {
         method: "PUT",
         body: JSON.stringify(data),
       },
-      () => clientStore.updatePlan(id, data)
+      () => {
+        const res = clientStore.updatePlan(id, data);
+        syncService.enqueueMutation({
+          type: "UPDATE_PLAN",
+          entityId: id,
+          planId: id,
+          payload: data,
+        });
+        return res;
+      }
     );
   },
 
@@ -267,7 +284,16 @@ export const api = {
       {
         method: "DELETE",
       },
-      () => clientStore.deletePlan(id)
+      () => {
+        const res = clientStore.deletePlan(id);
+        syncService.enqueueMutation({
+          type: "DELETE_PLAN",
+          entityId: id,
+          planId: id,
+          payload: {},
+        });
+        return res;
+      }
     );
   },
 
@@ -289,7 +315,16 @@ export const api = {
         method: "POST",
         body: JSON.stringify(data),
       },
-      () => clientStore.createTask(getCurrentUserId(), planId, data)
+      () => {
+        const res = clientStore.createTask(getCurrentUserId(), planId, data);
+        syncService.enqueueMutation({
+          type: "CREATE_TASK",
+          entityId: res.task.id,
+          planId,
+          payload: { ...res.task, plan_id: planId },
+        });
+        return res;
+      }
     );
   },
 
@@ -300,7 +335,16 @@ export const api = {
         method: "PUT",
         body: JSON.stringify(data),
       },
-      () => clientStore.updateTask(planId, taskId, data)
+      () => {
+        const res = clientStore.updateTask(planId, taskId, data);
+        syncService.enqueueMutation({
+          type: "UPDATE_TASK",
+          entityId: taskId,
+          planId,
+          payload: { ...data, plan_id: planId },
+        });
+        return res;
+      }
     );
   },
 
@@ -310,7 +354,16 @@ export const api = {
       {
         method: "PATCH",
       },
-      () => clientStore.toggleTask(planId, taskId)
+      () => {
+        const res = clientStore.toggleTask(planId, taskId);
+        syncService.enqueueMutation({
+          type: "TOGGLE_TASK",
+          entityId: taskId,
+          planId,
+          payload: { status: res.task.status, plan_id: planId },
+        });
+        return res;
+      }
     );
   },
 
@@ -320,7 +373,16 @@ export const api = {
       {
         method: "DELETE",
       },
-      () => clientStore.deleteTask(planId, taskId)
+      () => {
+        const res = clientStore.deleteTask(planId, taskId);
+        syncService.enqueueMutation({
+          type: "DELETE_TASK",
+          entityId: taskId,
+          planId,
+          payload: {},
+        });
+        return res;
+      }
     );
   },
 
@@ -332,7 +394,16 @@ export const api = {
         method: "POST",
         body: JSON.stringify(data),
       },
-      () => clientStore.createMilestone(planId, data)
+      () => {
+        const res = clientStore.createMilestone(planId, data);
+        syncService.enqueueMutation({
+          type: "CREATE_MILESTONE",
+          entityId: res.milestone.id,
+          planId,
+          payload: { ...res.milestone, plan_id: planId },
+        });
+        return res;
+      }
     );
   },
 
@@ -343,7 +414,16 @@ export const api = {
         method: "PUT",
         body: JSON.stringify(data),
       },
-      () => clientStore.updateMilestone(milestoneId, data)
+      () => {
+        const res = clientStore.updateMilestone(milestoneId, data);
+        syncService.enqueueMutation({
+          type: "UPDATE_MILESTONE",
+          entityId: milestoneId,
+          planId,
+          payload: { ...data, plan_id: planId },
+        });
+        return res;
+      }
     );
   },
 
@@ -353,7 +433,16 @@ export const api = {
       {
         method: "PATCH",
       },
-      () => clientStore.toggleMilestone(milestoneId)
+      () => {
+        const res = clientStore.toggleMilestone(milestoneId);
+        syncService.enqueueMutation({
+          type: "TOGGLE_MILESTONE",
+          entityId: milestoneId,
+          planId,
+          payload: { status: res.milestone.status, plan_id: planId },
+        });
+        return res;
+      }
     );
   },
 
@@ -363,7 +452,16 @@ export const api = {
       {
         method: "DELETE",
       },
-      () => clientStore.deleteMilestone(milestoneId)
+      () => {
+        const res = clientStore.deleteMilestone(milestoneId);
+        syncService.enqueueMutation({
+          type: "DELETE_MILESTONE",
+          entityId: milestoneId,
+          planId,
+          payload: {},
+        });
+        return res;
+      }
     );
   },
 
@@ -375,7 +473,16 @@ export const api = {
         method: "POST",
         body: JSON.stringify(data),
       },
-      () => clientStore.createBudgetItem(planId, data)
+      () => {
+        const res = clientStore.createBudgetItem(planId, data);
+        syncService.enqueueMutation({
+          type: "CREATE_BUDGET_ITEM",
+          entityId: res.item.id,
+          planId,
+          payload: { ...res.item, plan_id: planId },
+        });
+        return res;
+      }
     );
   },
 
@@ -386,7 +493,16 @@ export const api = {
         method: "PUT",
         body: JSON.stringify(data),
       },
-      () => clientStore.updateBudgetItem(planId, itemId, data)
+      () => {
+        const res = clientStore.updateBudgetItem(planId, itemId, data);
+        syncService.enqueueMutation({
+          type: "UPDATE_BUDGET_ITEM",
+          entityId: itemId,
+          planId,
+          payload: { ...data, plan_id: planId },
+        });
+        return res;
+      }
     );
   },
 
@@ -396,7 +512,16 @@ export const api = {
       {
         method: "DELETE",
       },
-      () => clientStore.deleteBudgetItem(planId, itemId)
+      () => {
+        const res = clientStore.deleteBudgetItem(planId, itemId);
+        syncService.enqueueMutation({
+          type: "DELETE_BUDGET_ITEM",
+          entityId: itemId,
+          planId,
+          payload: {},
+        });
+        return res;
+      }
     );
   },
 
@@ -408,7 +533,16 @@ export const api = {
         method: "PUT",
         body: JSON.stringify({ notes }),
       },
-      () => clientStore.updateNotes(planId, notes)
+      () => {
+        const res = clientStore.updateNotes(planId, notes);
+        syncService.enqueueMutation({
+          type: "UPDATE_NOTES",
+          entityId: planId,
+          planId,
+          payload: { notes },
+        });
+        return res;
+      }
     );
   },
 

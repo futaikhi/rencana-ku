@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { UserAvatar } from "../common/UserAvatar";
 import { BrandLogo } from "../common/BrandLogo";
+import { PWAInstallButton } from "../common/PWAInstallButton";
 import {
   Compass,
   CheckCircle2,
@@ -83,6 +84,8 @@ export const LandingView: React.FC<LandingViewProps> = () => {
 
           {/* Quick Actions */}
           <div className="flex items-center space-x-2">
+            <PWAInstallButton variant="pill" showAlways />
+
             <button
               type="button"
               onClick={() => {
@@ -216,6 +219,11 @@ export const LandingView: React.FC<LandingViewProps> = () => {
                 </p>
               </div>
             </div>
+          </div>
+
+          {/* In-App Install Callout Banner */}
+          <div className="pt-2">
+            <PWAInstallButton variant="banner" showAlways />
           </div>
         </div>
 

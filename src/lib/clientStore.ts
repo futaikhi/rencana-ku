@@ -954,4 +954,12 @@ export const clientStore = {
       activities: state.activities.filter((a) => visiblePlanIds.has(a.plan_id)),
     };
   },
+
+  loadRawState(): LocalState {
+    return loadState();
+  },
+
+  saveRawState(state: LocalState) {
+    saveState(state);
+  },
 };

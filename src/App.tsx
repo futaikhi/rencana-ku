@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useAuth } from "./context/AuthContext";
 import { api } from "./lib/api";
+import { syncService } from "./lib/syncService";
 import {
   Plan,
   PlanDetailResponse,
@@ -26,6 +27,7 @@ import { InviteModal } from "./components/plan/InviteModal";
 import { InvitationsModal } from "./components/plan/InvitationsModal";
 import { ConfirmModal } from "./components/common/ConfirmModal";
 import { BrandLogo } from "./components/common/BrandLogo";
+import { OfflineIndicator } from "./components/common/OfflineIndicator";
 import { useToast } from "./context/ToastContext";
 import { Loader2, AlertCircle } from "lucide-react";
 
@@ -148,6 +150,35 @@ export default function App() {
       setCurrentPlanDetail(null);
     }
   }, [selectedPlanId, token, loadPlanDetail]);
+
+  // Sync when opening the app while online (once, strictly no background timer loops)
+  useEffect(() => {
+    if (token && typeof navigator !== "undefined" && navigator.onLine) {
+      syncService.syncNow().then((res) => {
+        if (res.success && res.appliedCount > 0) {
+          loadDashboard();
+          showSuccess(
+            `Data disinkronkan: ${res.appliedCount} perubahan offline berhasil diterapkan.`,
+            "Sinkronisasi Berhasil"
+          );
+        }
+      });
+    }
+  }, [token, loadDashboard, showSuccess]);
+
+  // Reload dashboard and active plan when manual sync completes
+  useEffect(() => {
+    const handleSyncComplete = () => {
+      loadDashboard();
+      if (selectedPlanId) {
+        loadPlanDetail(selectedPlanId);
+      }
+    };
+    window.addEventListener("plancraft-sync-complete", handleSyncComplete);
+    return () => {
+      window.removeEventListener("plancraft-sync-complete", handleSyncComplete);
+    };
+  }, [loadDashboard, selectedPlanId, loadPlanDetail]);
 
   // --- Handlers for Plans ---
   const handleCreateOrUpdatePlan = async (data: {
@@ -754,6 +785,9 @@ export default function App() {
           }}
         />
       )}
+
+      {/* Connectivity Status Toast for PWA */}
+      <OfflineIndicator />
     </div>
   );
 }
