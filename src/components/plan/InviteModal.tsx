@@ -156,7 +156,18 @@ export const InviteModal: React.FC<InviteModalProps> = ({
                       <div className="flex items-center space-x-2 truncate">
                         <UserAvatar name={u.name} size="xs" />
                         <div className="truncate">
-                          <p className="text-xs truncate font-black">{u.name}</p>
+                          <div className="flex items-center space-x-1.5">
+                            <p className="text-xs truncate font-black">{u.name}</p>
+                            {u.is_demo ? (
+                              <span className="text-[8px] font-black uppercase px-1 py-0.2 bg-amber-200 text-black border border-black/40 rounded">
+                                Demo
+                              </span>
+                            ) : (
+                              <span className="text-[8px] font-black uppercase px-1 py-0.2 bg-[#E0FF62] text-black border border-black/40 rounded">
+                                Real User
+                              </span>
+                            )}
+                          </div>
                           <p className="text-[10px] opacity-60 truncate">{u.email}</p>
                         </div>
                       </div>

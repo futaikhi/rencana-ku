@@ -1,61 +1,70 @@
-import initSqlJs, { Database as SqlJsDatabase } from "sql.js";
+import { createClient, Client } from "@libsql/client";
+import dotenv from "dotenv";
 import fs from "fs";
 import path from "path";
 import bcrypt from "bcryptjs";
 
+dotenv.config();
+
 const DATA_DIR = path.join(process.cwd(), "data");
-const DB_FILE = path.join(DATA_DIR, "rencanaku.sqlite");
+const defaultUrl = `file:${path.join(DATA_DIR, "plancraft.db")}`;
+const url = process.env.TURSO_DATABASE_URL || defaultUrl;
+const authToken = process.env.TURSO_AUTH_TOKEN;
 
-let dbInstance: SqlJsDatabase | null = null;
+let dbInstance: Client | null = null;
 
-export async function getDb(): Promise<SqlJsDatabase> {
+export async function getDb(): Promise<Client> {
   if (dbInstance) {
     return dbInstance;
   }
 
-  if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
+  if (url.startsWith("file:")) {
+    if (!fs.existsSync(DATA_DIR)) {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+    }
   }
 
-  const SQL = await initSqlJs();
+  console.log(`[Turso DB] Connecting with libSQL: ${url.startsWith("file:") ? url : "Remote Turso URL configured"}`);
 
-  if (fs.existsSync(DB_FILE)) {
-    const fileBuffer = fs.readFileSync(DB_FILE);
-    dbInstance = new SQL.Database(fileBuffer);
-  } else {
-    dbInstance = new SQL.Database();
-  }
+  dbInstance = createClient({
+    url,
+    authToken,
+  });
 
   // Enable foreign keys
-  dbInstance.run("PRAGMA foreign_keys = ON;");
+  await dbInstance.execute("PRAGMA foreign_keys = ON;");
 
   // Initialize schema
-  initSchema(dbInstance);
+  await initSchema(dbInstance);
 
   // Check if seed data is needed
-  seedInitialData(dbInstance);
-
-  saveDb();
+  await seedInitialData(dbInstance);
 
   return dbInstance;
 }
 
 export function saveDb() {
-  if (!dbInstance) return;
-  try {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
-    const data = dbInstance.export();
-    const buffer = Buffer.from(data);
-    fs.writeFileSync(DB_FILE, buffer);
-  } catch (err) {
-    console.error("Failed to save database to disk:", err);
-  }
+  // libSQL automatically persists mutations to disk or remote Turso cloud
 }
 
-function initSchema(db: SqlJsDatabase) {
-  db.run(`
+export async function queryAll<T = any>(sql: string, params: any[] = []): Promise<T[]> {
+  const db = await getDb();
+  const res = await db.execute({ sql, args: params });
+  return res.rows as unknown as T[];
+}
+
+export async function queryOne<T = any>(sql: string, params: any[] = []): Promise<T | null> {
+  const rows = await queryAll<T>(sql, params);
+  return rows.length > 0 ? rows[0] : null;
+}
+
+export async function execute(sql: string, params: any[] = []): Promise<void> {
+  const db = await getDb();
+  await db.execute({ sql, args: params });
+}
+
+async function initSchema(db: Client) {
+  await db.executeMultiple(`
     CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
@@ -63,6 +72,7 @@ function initSchema(db: SqlJsDatabase) {
       password_hash TEXT NOT NULL,
       avatar_url TEXT,
       bio TEXT,
+      is_demo INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL
     );
 
@@ -87,7 +97,7 @@ function initSchema(db: SqlJsDatabase) {
       id TEXT PRIMARY KEY,
       plan_id TEXT NOT NULL,
       user_id TEXT NOT NULL,
-      role TEXT NOT NULL, -- 'OWNER', 'EDITOR', 'VIEWER'
+      role TEXT NOT NULL,
       joined_at TEXT NOT NULL,
       UNIQUE(plan_id, user_id),
       FOREIGN KEY (plan_id) REFERENCES plans(id) ON DELETE CASCADE,
@@ -99,8 +109,8 @@ function initSchema(db: SqlJsDatabase) {
       plan_id TEXT NOT NULL,
       inviter_id TEXT NOT NULL,
       invitee_id TEXT NOT NULL,
-      role TEXT NOT NULL DEFAULT 'EDITOR', -- 'EDITOR', 'VIEWER'
-      status TEXT NOT NULL DEFAULT 'PENDING', -- 'PENDING', 'ACCEPTED', 'DECLINED', 'EXPIRED'
+      role TEXT NOT NULL DEFAULT 'EDITOR',
+      status TEXT NOT NULL DEFAULT 'PENDING',
       created_at TEXT NOT NULL,
       expires_at TEXT,
       FOREIGN KEY (plan_id) REFERENCES plans(id) ON DELETE CASCADE,
@@ -114,7 +124,7 @@ function initSchema(db: SqlJsDatabase) {
       title TEXT NOT NULL,
       description TEXT,
       target_date TEXT,
-      status TEXT NOT NULL DEFAULT 'PENDING', -- 'PENDING', 'COMPLETED'
+      status TEXT NOT NULL DEFAULT 'PENDING',
       sort_order INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
@@ -127,8 +137,8 @@ function initSchema(db: SqlJsDatabase) {
       milestone_id TEXT,
       title TEXT NOT NULL,
       description TEXT,
-      status TEXT NOT NULL DEFAULT 'TODO', -- 'TODO', 'IN_PROGRESS', 'COMPLETED'
-      priority TEXT NOT NULL DEFAULT 'MEDIUM', -- 'LOW', 'MEDIUM', 'HIGH'
+      status TEXT NOT NULL DEFAULT 'TODO',
+      priority TEXT NOT NULL DEFAULT 'MEDIUM',
       due_date TEXT,
       assignee_id TEXT,
       created_by TEXT NOT NULL,
@@ -175,60 +185,49 @@ function initSchema(db: SqlJsDatabase) {
     CREATE INDEX IF NOT EXISTS idx_activities_plan ON activities(plan_id);
     CREATE INDEX IF NOT EXISTS idx_invitations_invitee ON plan_invitations(invitee_id, status);
   `);
-}
 
-// Database query helpers
-export function queryAll<T = any>(sql: string, params: any[] = []): T[] {
-  if (!dbInstance) throw new Error("Database not initialized");
-  const stmt = dbInstance.prepare(sql);
-  stmt.bind(params);
-  const results: T[] = [];
-  while (stmt.step()) {
-    const row = stmt.getAsObject() as T;
-    results.push(row);
+  // Safe migration: Add is_demo column if not exists (for existing SQLite/Turso databases)
+  try {
+    await db.execute("ALTER TABLE users ADD COLUMN is_demo INTEGER NOT NULL DEFAULT 0;");
+  } catch {
+    // Column already exists or table freshly created
   }
-  stmt.free();
-  return results;
+
+  // Ensure initial demo accounts are marked as is_demo = 1
+  try {
+    await db.execute(
+      "UPDATE users SET is_demo = 1 WHERE id IN ('user_one_01', 'user_two_02') OR email IN ('user1@plancraft.app', 'user2@plancraft.app');"
+    );
+  } catch {
+    // Ignore error if users table is not yet seeded
+  }
 }
 
-export function queryOne<T = any>(sql: string, params: any[] = []): T | null {
-  const rows = queryAll<T>(sql, params);
-  return rows.length > 0 ? rows[0] : null;
-}
-
-export function execute(sql: string, params: any[] = []): void {
-  if (!dbInstance) throw new Error("Database not initialized");
-  const stmt = dbInstance.prepare(sql);
-  stmt.run(params);
-  stmt.free();
-  saveDb();
-}
-
-function seedInitialData(db: SqlJsDatabase) {
-  const usersCount = queryOne<{ count: number }>("SELECT COUNT(*) as count FROM users;");
-  if (usersCount && usersCount.count > 0) {
+async function seedInitialData(db: Client) {
+  const usersCount = await queryOne<{ count: number }>("SELECT COUNT(*) as count FROM users;");
+  if (usersCount && Number(usersCount.count) > 0) {
     return;
   }
 
-  console.log("Seeding initial demo data for RencanaKu (2 Users: User One & User Two)...");
+  console.log("Seeding initial demo data for PlanCraft into Turso (2 Users: User One & User Two)...");
 
   const hash = bcrypt.hashSync("password123", 10);
   const now = new Date().toISOString();
 
-  // 1. Create Exactly 2 Demo Users
+  // 1. Create Exactly 2 Demo Users (is_demo = 1)
   const user1Id = "user_one_01";
   const user2Id = "user_two_02";
 
-  execute(`
-    INSERT INTO users (id, name, email, password_hash, avatar_url, bio, created_at)
+  await execute(`
+    INSERT INTO users (id, name, email, password_hash, avatar_url, bio, is_demo, created_at)
     VALUES 
-      (?, 'User One', 'user1@rencanaku.app', ?, 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80', 'Primary Planner (Demo 1)', ?),
-      (?, 'User Two', 'user2@rencanaku.app', ?, 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80', 'Collaborator (Demo 2)', ?);
+      (?, 'User One', 'user1@plancraft.app', ?, 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80', 'Primary Planner (Demo 1)', 1, ?),
+      (?, 'User Two', 'user2@plancraft.app', ?, 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80', 'Collaborator (Demo 2)', 1, ?);
   `, [user1Id, hash, now, user2Id, hash, now]);
 
   // 2. Plan 1: Wedding (💍) - Owned by User One, Collaborator: User Two (Editor)
   const weddingId = "plan_wedding_01";
-  execute(`
+  await execute(`
     INSERT INTO plans (id, owner_id, name, description, category, icon, color, target_date, budget_enabled, budget_target, notes, created_at, updated_at)
     VALUES (?, ?, 'Wedding Celebration', 'Our dream garden wedding celebration with close friends and family in Bandung.', 'Wedding', 'HeartHandshake', '#C45A38', '2027-12-18', 1, 75000000, 
     'Notes for the wedding:
@@ -240,7 +239,7 @@ function seedInitialData(db: SqlJsDatabase) {
   `, [weddingId, user1Id, now, now]);
 
   // Memberships
-  execute(`
+  await execute(`
     INSERT INTO plan_members (id, plan_id, user_id, role, joined_at)
     VALUES 
       ('pm_wed_1', ?, ?, 'OWNER', ?),
@@ -255,7 +254,7 @@ function seedInitialData(db: SqlJsDatabase) {
   const m5 = "ms_wed_5";
   const m6 = "ms_wed_6";
 
-  execute(`
+  await execute(`
     INSERT INTO milestones (id, plan_id, title, description, target_date, status, sort_order, created_at, updated_at)
     VALUES 
       (?, ?, 'Decide Wedding Date & Guest Count', 'Lock in the official date and finalize headcount.', '2026-08-15', 'COMPLETED', 1, ?, ?),
@@ -267,7 +266,7 @@ function seedInitialData(db: SqlJsDatabase) {
   `, [m1, weddingId, now, now, m2, weddingId, now, now, m3, weddingId, now, now, m4, weddingId, now, now, m5, weddingId, now, now, m6, weddingId, now, now]);
 
   // Tasks for Wedding
-  execute(`
+  await execute(`
     INSERT INTO tasks (id, plan_id, milestone_id, title, description, status, priority, due_date, assignee_id, created_by, sort_order, created_at, updated_at)
     VALUES 
       ('t_wed_1', ?, ?, 'Finalize family headcount and guest roster', 'Coordinate with parents for the core guest list', 'COMPLETED', 'HIGH', '2026-08-10', ?, ?, 1, ?, ?),
@@ -294,7 +293,7 @@ function seedInitialData(db: SqlJsDatabase) {
   ]);
 
   // Budget items for Wedding
-  execute(`
+  await execute(`
     INSERT INTO budget_items (id, plan_id, name, estimated_amount, actual_amount, notes, created_at, updated_at)
     VALUES 
       ('b_wed_1', ?, 'Garden Venue Rental', 20000000, 20000000, 'Down payment paid in full', ?, ?),
@@ -315,7 +314,7 @@ function seedInitialData(db: SqlJsDatabase) {
   ]);
 
   // Activity for Wedding
-  execute(`
+  await execute(`
     INSERT INTO activities (id, plan_id, actor_id, action, details, entity_type, entity_id, created_at)
     VALUES 
       ('act_1', ?, ?, 'created_plan', 'created the Plan "Wedding Celebration"', 'plan', ?, ?),
@@ -333,7 +332,7 @@ function seedInitialData(db: SqlJsDatabase) {
 
   // 3. Plan 2: Build a House (🏠) - Owned by User One
   const houseId = "plan_house_02";
-  execute(`
+  await execute(`
     INSERT INTO plans (id, owner_id, name, description, category, icon, color, target_date, budget_enabled, budget_target, notes, created_at, updated_at)
     VALUES (?, ?, 'Build Our Dream Home', 'Building an eco-friendly modern tropical home with natural light and courtyard.', 'House', 'Home', '#3B6E58', '2028-06-30', 1, 500000000,
     'Architectural concept:
@@ -344,7 +343,7 @@ function seedInitialData(db: SqlJsDatabase) {
     ?, ?);
   `, [houseId, user1Id, now, now]);
 
-  execute(`
+  await execute(`
     INSERT INTO plan_members (id, plan_id, user_id, role, joined_at)
     VALUES ('pm_house_1', ?, ?, 'OWNER', ?);
   `, [houseId, user1Id, now]);
@@ -353,7 +352,7 @@ function seedInitialData(db: SqlJsDatabase) {
   const msH2 = "ms_house_2";
   const msH3 = "ms_house_3";
 
-  execute(`
+  await execute(`
     INSERT INTO milestones (id, plan_id, title, description, target_date, status, sort_order, created_at, updated_at)
     VALUES 
       (?, ?, 'Land Acquisition & Survey', 'Legal verification of certificate and soil topographic test.', '2026-11-01', 'COMPLETED', 1, ?, ?),
@@ -361,7 +360,7 @@ function seedInitialData(db: SqlJsDatabase) {
       (?, ?, 'Foundation & Structural Framing', 'Concrete column pouring, steel reinforcement, and roof rafters.', '2027-10-15', 'PENDING', 3, ?, ?);
   `, [msH1, houseId, now, now, msH2, houseId, now, now, msH3, houseId, now, now]);
 
-  execute(`
+  await execute(`
     INSERT INTO tasks (id, plan_id, milestone_id, title, description, status, priority, due_date, assignee_id, created_by, sort_order, created_at, updated_at)
     VALUES 
       ('t_house_1', ?, ?, 'Complete notary verification and land certificate transfer', 'Ensure SHM free of legal dispute', 'COMPLETED', 'HIGH', '2026-10-15', ?, ?, 1, ?, ?),
@@ -377,7 +376,7 @@ function seedInitialData(db: SqlJsDatabase) {
     houseId, msH2, user1Id, user1Id, now, now,
   ]);
 
-  execute(`
+  await execute(`
     INSERT INTO budget_items (id, plan_id, name, estimated_amount, actual_amount, notes, created_at, updated_at)
     VALUES 
       ('b_house_1', ?, 'Land Plot (200 sqm) + Notary Taxes', 220000000, 215000000, 'Fully paid and certified', ?, ?),
@@ -395,7 +394,7 @@ function seedInitialData(db: SqlJsDatabase) {
 
   // 4. Plan 3: Japan Autumn Trip (✈️) - Owned by User Two, User One is Member (Editor)
   const tripId = "plan_trip_03";
-  execute(`
+  await execute(`
     INSERT INTO plans (id, owner_id, name, description, category, icon, color, target_date, budget_enabled, budget_target, notes, created_at, updated_at)
     VALUES (?, ?, 'Japan Autumn Odyssey', 'Tokyo, Kyoto, and Takayama autumn foliage exploration with culinary walks.', 'Vacation', 'Plane', '#B8731F', '2027-10-25', 1, 30000000,
     'Trip Highlights:
@@ -406,7 +405,7 @@ function seedInitialData(db: SqlJsDatabase) {
     ?, ?);
   `, [tripId, user2Id, now, now]);
 
-  execute(`
+  await execute(`
     INSERT INTO plan_members (id, plan_id, user_id, role, joined_at)
     VALUES 
       ('pm_trip_1', ?, ?, 'OWNER', ?),
@@ -416,14 +415,14 @@ function seedInitialData(db: SqlJsDatabase) {
   const msT1 = "ms_trip_1";
   const msT2 = "ms_trip_2";
 
-  execute(`
+  await execute(`
     INSERT INTO milestones (id, plan_id, title, description, target_date, status, sort_order, created_at, updated_at)
     VALUES 
       (?, ?, 'Flight & Visa Readiness', 'Lock down roundtrip flights and Japanese e-visa.', '2027-05-15', 'COMPLETED', 1, ?, ?),
       (?, ?, 'Accommodation & Rail Pass', 'Book Ryokan in Takayama and city hotels.', '2027-08-01', 'PENDING', 2, ?, ?);
   `, [msT1, tripId, now, now, msT2, tripId, now, now]);
 
-  execute(`
+  await execute(`
     INSERT INTO tasks (id, plan_id, milestone_id, title, description, status, priority, due_date, assignee_id, created_by, sort_order, created_at, updated_at)
     VALUES 
       ('t_trip_1', ?, ?, 'Monitor and purchase promo roundtrip tickets', 'Target direct flights CGK - HND', 'COMPLETED', 'HIGH', '2027-05-01', ?, ?, 1, ?, ?),
@@ -437,7 +436,7 @@ function seedInitialData(db: SqlJsDatabase) {
     tripId, msT2, user1Id, user2Id, now, now,
   ]);
 
-  execute(`
+  await execute(`
     INSERT INTO budget_items (id, plan_id, name, estimated_amount, actual_amount, notes, created_at, updated_at)
     VALUES 
       ('b_trip_1', ?, 'Roundtrip Flights (2 Pax)', 14000000, 13800000, 'Direct flight booked', ?, ?),
@@ -453,7 +452,7 @@ function seedInitialData(db: SqlJsDatabase) {
 
   // 5. Plan 4: Learn Japanese (🎓) - Non-monetary plan! (Owned by User One)
   const studyId = "plan_study_04";
-  execute(`
+  await execute(`
     INSERT INTO plans (id, owner_id, name, description, category, icon, color, target_date, budget_enabled, budget_target, notes, created_at, updated_at)
     VALUES (?, ?, 'Master Japanese for JLPT N3', 'Systematic self-study plan to achieve conversational fluency and pass the JLPT N3 exam.', 'Education', 'GraduationCap', '#5A67D8', '2027-07-04', 0, 0,
     'Study Strategy:
@@ -464,7 +463,7 @@ function seedInitialData(db: SqlJsDatabase) {
     ?, ?);
   `, [studyId, user1Id, now, now]);
 
-  execute(`
+  await execute(`
     INSERT INTO plan_members (id, plan_id, user_id, role, joined_at)
     VALUES ('pm_study_1', ?, ?, 'OWNER', ?);
   `, [studyId, user1Id, now]);
@@ -473,7 +472,7 @@ function seedInitialData(db: SqlJsDatabase) {
   const msS2 = "ms_study_2";
   const msS3 = "ms_study_3";
 
-  execute(`
+  await execute(`
     INSERT INTO milestones (id, plan_id, title, description, target_date, status, sort_order, created_at, updated_at)
     VALUES 
       (?, ?, 'JLPT N5 Foundations (800 Vocab & 100 Kanji)', 'Master Kana, basic particles, and simple sentence structures.', '2026-10-31', 'COMPLETED', 1, ?, ?),
@@ -481,7 +480,7 @@ function seedInitialData(db: SqlJsDatabase) {
       (?, ?, 'JLPT N3 Fluency & Mock Exam Pass', 'Nuanced reading comprehension, 650 Kanji, and official exam sitting.', '2027-07-04', 'PENDING', 3, ?, ?);
   `, [msS1, studyId, now, now, msS2, studyId, now, now, msS3, studyId, now, now]);
 
-  execute(`
+  await execute(`
     INSERT INTO tasks (id, plan_id, milestone_id, title, description, status, priority, due_date, assignee_id, created_by, sort_order, created_at, updated_at)
     VALUES 
       ('t_study_1', ?, ?, 'Complete Genki I textbook and workbook exercises', 'Chapters 1 through 12', 'COMPLETED', 'HIGH', '2026-09-15', ?, ?, 1, ?, ?),
@@ -497,11 +496,11 @@ function seedInitialData(db: SqlJsDatabase) {
     studyId, msS3, user1Id, user1Id, now, now,
   ]);
 
-  // 6. Pending Invitation: User Two invites User One to "Launch RencanaKu SaaS"
+  // 6. Pending Invitation: User Two invites User One to "Launch PlanCraft SaaS"
   const saasId = "plan_saas_05";
-  execute(`
+  await execute(`
     INSERT INTO plans (id, owner_id, name, description, category, icon, color, target_date, budget_enabled, budget_target, notes, created_at, updated_at)
-    VALUES (?, ?, 'Launch RencanaKu SaaS', 'Build, polish, and launch our multi-user collaborative life planning web application.', 'Business', 'Rocket', '#0F766E', '2026-11-30', 1, 25000000,
+    VALUES (?, ?, 'Launch PlanCraft SaaS', 'Build, polish, and launch our multi-user collaborative life planning web application.', 'Business', 'Rocket', '#0F766E', '2026-11-30', 1, 25000000,
     'Core MVP Scope:
 - Multi-user authentication & secure isolation
 - Real-time plan progress computation
@@ -511,12 +510,12 @@ function seedInitialData(db: SqlJsDatabase) {
     ?, ?);
   `, [saasId, user2Id, now, now]);
 
-  execute(`
+  await execute(`
     INSERT INTO plan_members (id, plan_id, user_id, role, joined_at)
     VALUES ('pm_saas_1', ?, ?, 'OWNER', ?);
   `, [saasId, user2Id, now]);
 
-  execute(`
+  await execute(`
     INSERT INTO plan_invitations (id, plan_id, inviter_id, invitee_id, role, status, created_at)
     VALUES ('inv_saas_user1', ?, ?, ?, 'EDITOR', 'PENDING', ?);
   `, [saasId, user2Id, user1Id, now]);

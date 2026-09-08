@@ -6,11 +6,11 @@ import { getPlanAccess } from "../authorization.js";
 const router = Router();
 
 // Get recent activity across all user plans (Dashboard Feed)
-router.get("/feed", authenticateToken, (req: AuthRequest, res: Response) => {
+router.get("/feed", authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.id;
 
-    const activities = queryAll(
+    const activities = await queryAll(
       `SELECT a.*, u.name as actor_name, u.avatar_url as actor_avatar,
               p.name as plan_name, p.icon as plan_icon, p.color as plan_color
        FROM activities a
@@ -30,17 +30,17 @@ router.get("/feed", authenticateToken, (req: AuthRequest, res: Response) => {
 });
 
 // Get activity for specific plan
-router.get("/plans/:planId", authenticateToken, (req: AuthRequest, res: Response) => {
+router.get("/plans/:planId", authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.id;
     const planId = req.params.planId;
 
-    const access = getPlanAccess(userId, planId);
+    const access = await getPlanAccess(userId, planId);
     if (!access.hasAccess) {
       return res.status(403).json({ error: "Access denied." });
     }
 
-    const activities = queryAll(
+    const activities = await queryAll(
       `SELECT a.*, u.name as actor_name, u.avatar_url as actor_avatar
        FROM activities a
        JOIN users u ON a.actor_id = u.id

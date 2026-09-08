@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { User, PlanInvitation } from "../types";
-import { api, getToken, setToken, removeToken } from "../lib/api";
+import { api, getToken, removeToken } from "../lib/api";
 
 interface AuthContextType {
   user: User | null;
@@ -49,17 +49,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     loadDemoAccounts();
     const initAuth = async () => {
-      // Check for OAuth token in URL hash (set by backend after OAuth flow)
-      const hash = window.location.hash;
-      const oauthMatch = hash.match(/oauth_token=([^&]+)/);
-      if (oauthMatch) {
-        const oauthToken = decodeURIComponent(oauthMatch[1]);
-        setToken(oauthToken);
-        localStorage.setItem("rencanaku_token", oauthToken);
-        localStorage.setItem("rencanaku_current_user_id", "");
-        window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
-      }
-
       const currentToken = getToken();
       if (!currentToken) {
         setUser(null);
@@ -108,14 +97,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const res = await api.register(data);
     setUser(res.user);
     setTokenState(res.token);
-    await loadDemoAccounts();
+    // Real registered users are strictly separated from demo accounts
     await refreshInvitations();
   };
 
   const updateProfile = async (data: { name: string; bio?: string; avatar_url?: string }) => {
     const res = await api.updateProfile(data);
     setUser(res.user);
-    await loadDemoAccounts();
   };
 
   const logout = () => {

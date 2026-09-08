@@ -6,12 +6,12 @@ import { getPlanAccess, logActivity } from "../authorization.js";
 const router = Router({ mergeParams: true });
 
 // 1. Create Task
-router.post("/:planId/tasks", authenticateToken, (req: AuthRequest, res: Response) => {
+router.post("/:planId/tasks", authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.id;
     const planId = req.params.planId;
 
-    const access = getPlanAccess(userId, planId);
+    const access = await getPlanAccess(userId, planId);
     if (!access.canEdit) {
       return res.status(403).json({ error: "Permission denied. Only Owners and Editors can add tasks." });
     }
@@ -25,7 +25,7 @@ router.post("/:planId/tasks", authenticateToken, (req: AuthRequest, res: Respons
     const taskId = `t_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     const now = new Date().toISOString();
 
-    execute(
+    await execute(
       `INSERT INTO tasks (id, plan_id, milestone_id, title, description, status, priority, due_date, assignee_id, created_by, sort_order, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`,
       [
@@ -45,11 +45,11 @@ router.post("/:planId/tasks", authenticateToken, (req: AuthRequest, res: Respons
     );
 
     // Update plan's updated_at
-    execute("UPDATE plans SET updated_at = ? WHERE id = ?", [now, planId]);
+    await execute("UPDATE plans SET updated_at = ? WHERE id = ?", [now, planId]);
 
-    logActivity(planId, userId, "created_task", `added task "${title.trim()}"`, "task", taskId);
+    await logActivity(planId, userId, "created_task", `added task "${title.trim()}"`, "task", taskId);
 
-    const task = queryOne(
+    const task = await queryOne(
       `SELECT t.*, u.name as assignee_name, u.avatar_url as assignee_avatar, m.title as milestone_title
        FROM tasks t
        LEFT JOIN users u ON t.assignee_id = u.id
@@ -65,17 +65,17 @@ router.post("/:planId/tasks", authenticateToken, (req: AuthRequest, res: Respons
 });
 
 // 2. Update Task
-router.put("/:planId/tasks/:taskId", authenticateToken, (req: AuthRequest, res: Response) => {
+router.put("/:planId/tasks/:taskId", authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.id;
     const { planId, taskId } = req.params;
 
-    const access = getPlanAccess(userId, planId);
+    const access = await getPlanAccess(userId, planId);
     if (!access.canEdit) {
       return res.status(403).json({ error: "Permission denied. Only Owners and Editors can modify tasks." });
     }
 
-    const existing = queryOne<{ id: string; title: string; status: string }>(
+    const existing = await queryOne<{ id: string; title: string; status: string }>(
       "SELECT id, title, status FROM tasks WHERE id = ? AND plan_id = ?",
       [taskId, planId]
     );
@@ -92,7 +92,7 @@ router.put("/:planId/tasks/:taskId", authenticateToken, (req: AuthRequest, res: 
 
     const now = new Date().toISOString();
 
-    execute(
+    await execute(
       `UPDATE tasks 
        SET title = ?, description = ?, status = ?, priority = ?, due_date = ?, assignee_id = ?, milestone_id = ?, updated_at = ?
        WHERE id = ? AND plan_id = ?`,
@@ -110,20 +110,20 @@ router.put("/:planId/tasks/:taskId", authenticateToken, (req: AuthRequest, res: 
       ]
     );
 
-    execute("UPDATE plans SET updated_at = ? WHERE id = ?", [now, planId]);
+    await execute("UPDATE plans SET updated_at = ? WHERE id = ?", [now, planId]);
 
     // Check if status changed
     if (existing.status !== status) {
       if (status === "COMPLETED") {
-        logActivity(planId, userId, "completed_task", `completed "${title.trim()}"`, "task", taskId);
+        await logActivity(planId, userId, "completed_task", `completed "${title.trim()}"`, "task", taskId);
       } else {
-        logActivity(planId, userId, "reopened_task", `reopened "${title.trim()}"`, "task", taskId);
+        await logActivity(planId, userId, "reopened_task", `reopened "${title.trim()}"`, "task", taskId);
       }
     } else {
-      logActivity(planId, userId, "updated_task", `updated task "${title.trim()}"`, "task", taskId);
+      await logActivity(planId, userId, "updated_task", `updated task "${title.trim()}"`, "task", taskId);
     }
 
-    const updatedTask = queryOne(
+    const updatedTask = await queryOne(
       `SELECT t.*, u.name as assignee_name, u.avatar_url as assignee_avatar, m.title as milestone_title
        FROM tasks t
        LEFT JOIN users u ON t.assignee_id = u.id
@@ -139,17 +139,17 @@ router.put("/:planId/tasks/:taskId", authenticateToken, (req: AuthRequest, res: 
 });
 
 // 3. Quick Toggle Task Status
-router.patch("/:planId/tasks/:taskId/toggle", authenticateToken, (req: AuthRequest, res: Response) => {
+router.patch("/:planId/tasks/:taskId/toggle", authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.id;
     const { planId, taskId } = req.params;
 
-    const access = getPlanAccess(userId, planId);
+    const access = await getPlanAccess(userId, planId);
     if (!access.canEdit) {
       return res.status(403).json({ error: "Permission denied." });
     }
 
-    const task = queryOne<{ id: string; title: string; status: string }>(
+    const task = await queryOne<{ id: string; title: string; status: string }>(
       "SELECT id, title, status FROM tasks WHERE id = ? AND plan_id = ?",
       [taskId, planId]
     );
@@ -161,16 +161,16 @@ router.patch("/:planId/tasks/:taskId/toggle", authenticateToken, (req: AuthReque
     const nextStatus = task.status === "COMPLETED" ? "TODO" : "COMPLETED";
     const now = new Date().toISOString();
 
-    execute("UPDATE tasks SET status = ?, updated_at = ? WHERE id = ?", [nextStatus, now, taskId]);
-    execute("UPDATE plans SET updated_at = ? WHERE id = ?", [now, planId]);
+    await execute("UPDATE tasks SET status = ?, updated_at = ? WHERE id = ?", [nextStatus, now, taskId]);
+    await execute("UPDATE plans SET updated_at = ? WHERE id = ?", [now, planId]);
 
     if (nextStatus === "COMPLETED") {
-      logActivity(planId, userId, "completed_task", `completed "${task.title}"`, "task", taskId);
+      await logActivity(planId, userId, "completed_task", `completed "${task.title}"`, "task", taskId);
     } else {
-      logActivity(planId, userId, "reopened_task", `reopened "${task.title}"`, "task", taskId);
+      await logActivity(planId, userId, "reopened_task", `reopened "${task.title}"`, "task", taskId);
     }
 
-    const updatedTask = queryOne(
+    const updatedTask = await queryOne(
       `SELECT t.*, u.name as assignee_name, u.avatar_url as assignee_avatar, m.title as milestone_title
        FROM tasks t
        LEFT JOIN users u ON t.assignee_id = u.id
@@ -186,17 +186,17 @@ router.patch("/:planId/tasks/:taskId/toggle", authenticateToken, (req: AuthReque
 });
 
 // 4. Delete Task
-router.delete("/:planId/tasks/:taskId", authenticateToken, (req: AuthRequest, res: Response) => {
+router.delete("/:planId/tasks/:taskId", authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.id;
     const { planId, taskId } = req.params;
 
-    const access = getPlanAccess(userId, planId);
+    const access = await getPlanAccess(userId, planId);
     if (!access.canEdit) {
       return res.status(403).json({ error: "Permission denied." });
     }
 
-    const task = queryOne<{ title: string }>("SELECT title FROM tasks WHERE id = ? AND plan_id = ?", [
+    const task = await queryOne<{ title: string }>("SELECT title FROM tasks WHERE id = ? AND plan_id = ?", [
       taskId,
       planId,
     ]);
@@ -205,8 +205,8 @@ router.delete("/:planId/tasks/:taskId", authenticateToken, (req: AuthRequest, re
       return res.status(404).json({ error: "Task not found." });
     }
 
-    execute("DELETE FROM tasks WHERE id = ? AND plan_id = ?", [taskId, planId]);
-    logActivity(planId, userId, "deleted_task", `deleted task "${task.title}"`, "task", taskId);
+    await execute("DELETE FROM tasks WHERE id = ? AND plan_id = ?", [taskId, planId]);
+    await logActivity(planId, userId, "deleted_task", `deleted task "${task.title}"`, "task", taskId);
 
     res.json({ message: "Task deleted successfully." });
   } catch (err: any) {

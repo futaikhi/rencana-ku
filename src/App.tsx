@@ -156,7 +156,7 @@ export default function App() {
     category?: string;
     icon?: string;
     color?: string;
-    target_date?: string | "" | null;
+    target_date?: string | null;
     budget_enabled?: boolean;
     budget_target?: number;
     initialMilestones?: string[];
@@ -287,7 +287,7 @@ export default function App() {
     }
   };
 
-  const handleDeleteTask = async (taskId: string) => {
+  const handleDeleteTask = (taskId: string) => {
     if (!selectedPlanId) return;
     const task = currentPlanDetail?.tasks.find((t) => t.id === taskId);
     const taskTitle = task?.title || "this action item";
@@ -359,7 +359,7 @@ export default function App() {
     }
   };
 
-  const handleDeleteMilestone = async (milestoneId: string) => {
+  const handleDeleteMilestone = (milestoneId: string) => {
     if (!selectedPlanId) return;
     const ms = currentPlanDetail?.milestones.find((m) => m.id === milestoneId);
     const msTitle = ms?.title || "this milestone";
@@ -411,7 +411,7 @@ export default function App() {
     }
   };
 
-  const handleDeleteBudgetItem = async (itemId: string) => {
+  const handleDeleteBudgetItem = (itemId: string) => {
     if (!selectedPlanId) return;
     const item = currentPlanDetail?.budgetItems.find((b) => b.id === itemId);
     const itemName = item?.name || "this budget item";
@@ -463,7 +463,7 @@ export default function App() {
     }
   };
 
-  const handleRemoveMember = async (memberId: string) => {
+  const handleRemoveMember = (memberId: string) => {
     if (!selectedPlanId) return;
     const member = currentPlanDetail?.members.find((m) => m.id === memberId);
     const memberName = member?.name || "this collaborator";
@@ -526,7 +526,7 @@ export default function App() {
         </div>
         <div className="flex items-center space-x-2 text-xs font-black uppercase tracking-wider text-black/60 pt-2">
           <Loader2 size={16} className="animate-spin text-black stroke-[2.5]" />
-          <span>Loading RencanaKu...</span>
+          <span>Loading PlanCraft...</span>
         </div>
       </div>
     );

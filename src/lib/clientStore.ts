@@ -12,7 +12,7 @@ import {
   PlanStats,
 } from "../types";
 
-const STORAGE_KEY = "rencanaku_local_state_v1";
+const STORAGE_KEY = "plancraft_local_state_v1";
 
 interface StoredMember extends PlanMember {
   plan_id: string;
@@ -33,20 +33,22 @@ const INITIAL_USERS: (User & { password?: string })[] = [
   {
     id: "user_one_01",
     name: "User One",
-    email: "user1@rencanaku.app",
+    email: "user1@plancraft.app",
     password: "password123",
     avatar_url:
       "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
     bio: "Primary Planner (Demo 1)",
+    is_demo: true,
   },
   {
     id: "user_two_02",
     name: "User Two",
-    email: "user2@rencanaku.app",
+    email: "user2@plancraft.app",
     password: "password123",
     avatar_url:
       "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80",
     bio: "Collaborator (Demo 2)",
+    is_demo: true,
   },
 ];
 
@@ -173,7 +175,7 @@ const INITIAL_MEMBERS: StoredMember[] = [
     role: "OWNER",
     joined_at: new Date().toISOString(),
     name: "User One",
-    email: "user1@rencanaku.app",
+    email: "user1@plancraft.app",
     avatar_url: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
     bio: "Primary Planner (Demo 1)",
   },
@@ -184,7 +186,7 @@ const INITIAL_MEMBERS: StoredMember[] = [
     role: "EDITOR",
     joined_at: new Date().toISOString(),
     name: "User Two",
-    email: "user2@rencanaku.app",
+    email: "user2@plancraft.app",
     avatar_url: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80",
     bio: "Collaborator (Demo 2)",
   },
@@ -195,7 +197,7 @@ const INITIAL_MEMBERS: StoredMember[] = [
     role: "OWNER",
     joined_at: new Date().toISOString(),
     name: "User One",
-    email: "user1@rencanaku.app",
+    email: "user1@plancraft.app",
     avatar_url: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
   },
   {
@@ -205,7 +207,7 @@ const INITIAL_MEMBERS: StoredMember[] = [
     role: "OWNER",
     joined_at: new Date().toISOString(),
     name: "User Two",
-    email: "user2@rencanaku.app",
+    email: "user2@plancraft.app",
     avatar_url: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80",
   },
   {
@@ -215,7 +217,7 @@ const INITIAL_MEMBERS: StoredMember[] = [
     role: "EDITOR",
     joined_at: new Date().toISOString(),
     name: "User One",
-    email: "user1@rencanaku.app",
+    email: "user1@plancraft.app",
     avatar_url: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
   },
   {
@@ -225,7 +227,7 @@ const INITIAL_MEMBERS: StoredMember[] = [
     role: "OWNER",
     joined_at: new Date().toISOString(),
     name: "User One",
-    email: "user1@rencanaku.app",
+    email: "user1@plancraft.app",
     avatar_url: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
   },
 ];
@@ -360,14 +362,14 @@ const INITIAL_INVITATIONS: PlanInvitation[] = [
     role: "EDITOR",
     status: "PENDING",
     created_at: new Date().toISOString(),
-    plan_name: "Launch RencanaKu SaaS",
+    plan_name: "Launch PlanCraft SaaS",
     plan_icon: "Rocket",
     plan_color: "#0F766E",
     inviter_name: "User Two",
-    inviter_email: "user2@rencanaku.app",
+    inviter_email: "user2@plancraft.app",
     inviter_avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80",
     invitee_name: "User One",
-    invitee_email: "user1@rencanaku.app",
+    invitee_email: "user1@plancraft.app",
   },
 ];
 
@@ -470,7 +472,9 @@ export const clientStore = {
   getDemoAccounts(): { users: User[] } {
     const state = loadState();
     return {
-      users: state.users.map(({ password, ...u }) => u),
+      users: state.users
+        .filter((u) => u.is_demo || u.id === "user_one_01" || u.id === "user_two_02")
+        .map(({ password, ...u }) => ({ ...u, is_demo: true })),
     };
   },
 
@@ -484,18 +488,22 @@ export const clientStore = {
     }
     const { password, ...user } = found;
     const token = `local_${user.id}_${Date.now()}`;
-    return { user, token };
+    return { user: { ...user, is_demo: Boolean(user.is_demo) }, token };
   },
 
   demoLogin(email: string): { user: User; token: string } {
     const state = loadState();
-    const found = state.users.find((u) => u.email.toLowerCase() === email.toLowerCase());
+    const found = state.users.find(
+      (u) =>
+        u.email.toLowerCase() === email.toLowerCase() &&
+        (u.is_demo || u.id === "user_one_01" || u.id === "user_two_02")
+    );
     if (!found) {
-      throw new Error("Demo user not found");
+      throw new Error("Demo user not found or this account is not a demo account");
     }
     const { password, ...user } = found;
     const token = `local_${user.id}_${Date.now()}`;
-    return { user, token };
+    return { user: { ...user, is_demo: true }, token };
   },
 
   register(data: { name: string; email: string; password: string; bio?: string }): {
@@ -511,14 +519,15 @@ export const clientStore = {
       name: data.name,
       email: data.email,
       password: data.password,
-      bio: data.bio || "RencanaKu Explorer",
+      bio: data.bio || "PlanCraft Explorer",
       avatar_url: `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(data.name)}`,
+      is_demo: false,
     };
     state.users.push(newUser);
     saveState(state);
     const { password, ...user } = newUser;
     const token = `local_${user.id}_${Date.now()}`;
-    return { user, token };
+    return { user: { ...user, is_demo: false }, token };
   },
 
   getCurrentUser(userId: string): { user: User } {
@@ -528,7 +537,7 @@ export const clientStore = {
       throw new Error("User not found");
     }
     const { password, ...user } = found;
-    return { user };
+    return { user: { ...user, is_demo: Boolean(user.is_demo) } };
   },
 
   updateProfile(userId: string, data: { name: string; bio?: string; avatar_url?: string }): { user: User } {
@@ -540,7 +549,7 @@ export const clientStore = {
     if (data.avatar_url) user.avatar_url = data.avatar_url;
     saveState(state);
     const { password, ...safeUser } = user;
-    return { user: safeUser };
+    return { user: { ...safeUser, is_demo: Boolean(safeUser.is_demo) } };
   },
 
   searchUsers(query: string, excludeUserId: string): { users: User[] } {
@@ -548,7 +557,7 @@ export const clientStore = {
     const q = query.toLowerCase();
     const results = state.users
       .filter((u) => u.id !== excludeUserId && (u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q)))
-      .map(({ password, ...u }) => u);
+      .map(({ password, ...u }) => ({ ...u, is_demo: Boolean(u.is_demo) }));
     return { users: results };
   },
 
@@ -563,27 +572,12 @@ export const clientStore = {
       (inv) => inv.invitee_id === userId && inv.status === "PENDING"
     );
     const userPlanIds = [...myPlans.map((p) => p.id), ...sharedPlans.map((p) => p.id)];
-
-    const userPlansMap = new Map(state.plans.filter((p) => userPlanIds.includes(p.id)).map((p) => [p.id, p]));
-
     const upcomingTasks = state.tasks
       .filter((t) => userPlanIds.includes(t.plan_id) && t.status !== "COMPLETED")
-      .slice(0, 10)
-      .map((t) => ({
-        ...t,
-        plan_name: userPlansMap.get(t.plan_id)?.name || undefined,
-        plan_color: userPlansMap.get(t.plan_id)?.color || undefined,
-        plan_icon: userPlansMap.get(t.plan_id)?.icon || undefined,
-      }));
+      .slice(0, 10);
     const upcomingMilestones = state.milestones
       .filter((m) => userPlanIds.includes(m.plan_id) && m.status !== "COMPLETED")
-      .slice(0, 5)
-      .map((m) => ({
-        ...m,
-        plan_name: userPlansMap.get(m.plan_id)?.name || undefined,
-        plan_color: userPlansMap.get(m.plan_id)?.color || undefined,
-        plan_icon: userPlansMap.get(m.plan_id)?.icon || undefined,
-      }));
+      .slice(0, 5);
 
     // Attach stats
     for (const p of myPlans) {

@@ -1228,6 +1228,15 @@ export const PlanDetailView: React.FC<PlanDetailViewProps> = ({
                       <div className="flex items-center space-x-2">
                         <h4 className="text-sm font-black uppercase text-black">{m.name}</h4>
                         <RoleBadge role={m.role} size="sm" />
+                        {m.is_demo ? (
+                          <span className="text-[8px] font-black uppercase px-1.5 py-0.2 bg-amber-200 text-black border border-black/40 rounded">
+                            Demo
+                          </span>
+                        ) : (
+                          <span className="text-[8px] font-black uppercase px-1.5 py-0.2 bg-[#E0FF62] text-black border border-black/40 rounded">
+                            Real User
+                          </span>
+                        )}
                       </div>
                       <p className="text-xs opacity-60 font-semibold">{m.email}</p>
                       {m.bio && <p className="text-[11px] opacity-70 mt-0.5 font-medium">{m.bio}</p>}

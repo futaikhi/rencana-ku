@@ -34,18 +34,24 @@ export const LandingView: React.FC<LandingViewProps> = () => {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [bio, setBio] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+
+    if (authMode === "register" && password !== confirmPassword) {
+      setError("Password and confirm password do not match.");
+      return;
+    }
+
     setLoading(true);
 
     try {
       if (authMode === "register") {
-        await register({ name, email, password, bio });
+        await register({ name, email, password });
       } else {
         await login(email, password);
       }
@@ -225,6 +231,7 @@ export const LandingView: React.FC<LandingViewProps> = () => {
               onClick={() => {
                 setAuthMode("login");
                 setError(null);
+                setConfirmPassword("");
               }}
               className={`flex-1 py-2 text-xs font-black uppercase tracking-wider rounded-xl transition-all ${
                 authMode === "login"
@@ -239,6 +246,7 @@ export const LandingView: React.FC<LandingViewProps> = () => {
               onClick={() => {
                 setAuthMode("register");
                 setError(null);
+                setConfirmPassword("");
               }}
               className={`flex-1 py-2 text-xs font-black uppercase tracking-wider rounded-xl transition-all ${
                 authMode === "register"
@@ -366,15 +374,20 @@ export const LandingView: React.FC<LandingViewProps> = () => {
               {authMode === "register" && (
                 <div>
                   <label className="block text-xs font-black uppercase tracking-wider text-black mb-1">
-                    Bio / Role (Optional)
+                    Confirm Password <span className="text-[#E11D48]">*</span>
                   </label>
-                  <input
-                    type="text"
-                    value={bio}
-                    onChange={(e) => setBio(e.target.value)}
-                    placeholder="e.g. Product Lead & Builder"
-                    className="w-full px-3 py-2.5 text-xs sm:text-sm bg-[#F0F0F0] border-2 border-black rounded-2xl font-bold text-black focus:outline-none focus:bg-white"
-                  />
+                  <div className="relative">
+                    <input
+                      type="password"
+                      required
+                      minLength={6}
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="Re-enter your password"
+                      className="w-full pl-9 pr-3 py-2.5 text-xs sm:text-sm bg-[#F0F0F0] border-2 border-black rounded-2xl font-bold text-black focus:outline-none focus:bg-white focus:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
+                    />
+                    <Lock size={16} className="absolute left-3 top-3 text-black/50 stroke-[2.5]" />
+                  </div>
                 </div>
               )}
 
@@ -383,7 +396,7 @@ export const LandingView: React.FC<LandingViewProps> = () => {
                 disabled={loading}
                 className="w-full mt-2 py-3 bg-[#E0FF62] hover:bg-[#d4f745] disabled:opacity-50 text-xs sm:text-sm font-black uppercase tracking-wider text-black border-2 border-black rounded-2xl shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:translate-x-0.5 active:translate-y-0.5 transition-all flex items-center justify-center space-x-2"
               >
-                <span>{loading ? "Processing..." : authMode === "register" ? "Create Free Account" : "Sign In to RencanaKu"}</span>
+                <span>{loading ? "Processing..." : authMode === "register" ? "Create Free Account" : "Sign In to PlanCraft"}</span>
                 <ArrowRight size={16} className="stroke-[2.5]" />
               </button>
 
@@ -409,7 +422,7 @@ export const LandingView: React.FC<LandingViewProps> = () => {
           <div className="flex items-center space-x-2.5">
             <BrandLogo size="sm" showWordmark={false} />
             <p className="text-xs font-black uppercase tracking-wider text-black">
-              RencanaKu Mobile PWA • Real-time Collaboration
+              PlanCraft Mobile PWA • Real-time Collaboration
             </p>
           </div>
           <p className="text-xs text-black/60 font-medium">

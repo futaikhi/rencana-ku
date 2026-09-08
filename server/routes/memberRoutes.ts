@@ -6,24 +6,36 @@ import { getPlanAccess, logActivity } from "../authorization.js";
 const router = Router({ mergeParams: true });
 
 // Get Members
-router.get("/:planId/members", authenticateToken, (req: AuthRequest, res: Response) => {
+router.get("/:planId/members", authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.id;
     const planId = req.params.planId;
 
-    const access = getPlanAccess(userId, planId);
+    const access = await getPlanAccess(userId, planId);
     if (!access.hasAccess) {
       return res.status(403).json({ error: "Access denied." });
     }
 
-    const members = queryAll(
-      `SELECT pm.id, pm.user_id, pm.role, pm.joined_at, u.name, u.email, u.avatar_url, u.bio
+    const rawMembers = await queryAll<{
+      id: string;
+      user_id: string;
+      role: string;
+      joined_at: string;
+      name: string;
+      email: string;
+      avatar_url: string;
+      bio: string;
+      is_demo?: number;
+    }>(
+      `SELECT pm.id, pm.user_id, pm.role, pm.joined_at, u.name, u.email, u.avatar_url, u.bio, u.is_demo
        FROM plan_members pm
        JOIN users u ON pm.user_id = u.id
        WHERE pm.plan_id = ?
        ORDER BY CASE pm.role WHEN 'OWNER' THEN 1 WHEN 'EDITOR' THEN 2 ELSE 3 END, u.name ASC`,
       [planId]
     );
+
+    const members = rawMembers.map(m => ({ ...m, is_demo: Boolean(m.is_demo) }));
 
     res.json({ members, access });
   } catch (err: any) {
@@ -32,13 +44,13 @@ router.get("/:planId/members", authenticateToken, (req: AuthRequest, res: Respon
 });
 
 // Update Member Role (Owner only)
-router.put("/:planId/members/:memberId", authenticateToken, (req: AuthRequest, res: Response) => {
+router.put("/:planId/members/:memberId", authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.id;
     const { planId, memberId } = req.params;
     const { role } = req.body;
 
-    const access = getPlanAccess(userId, planId);
+    const access = await getPlanAccess(userId, planId);
     if (!access.isOwner) {
       return res.status(403).json({ error: "Only the Plan Owner can modify member roles." });
     }
@@ -47,7 +59,7 @@ router.put("/:planId/members/:memberId", authenticateToken, (req: AuthRequest, r
       return res.status(400).json({ error: "Role must be EDITOR or VIEWER." });
     }
 
-    const member = queryOne<{ id: string; user_id: string; role: string; name: string }>(
+    const member = await queryOne<{ id: string; user_id: string; role: string; name: string }>(
       `SELECT pm.id, pm.user_id, pm.role, u.name 
        FROM plan_members pm
        JOIN users u ON pm.user_id = u.id
@@ -63,10 +75,10 @@ router.put("/:planId/members/:memberId", authenticateToken, (req: AuthRequest, r
       return res.status(400).json({ error: "Cannot change the Owner's role." });
     }
 
-    execute("UPDATE plan_members SET role = ? WHERE id = ?", [role, memberId]);
-    logActivity(planId, userId, "updated_member_role", `changed ${member.name}'s role to ${role}`, "member", member.user_id);
+    await execute("UPDATE plan_members SET role = ? WHERE id = ?", [role, memberId]);
+    await logActivity(planId, userId, "updated_member_role", `changed ${member.name}'s role to ${role}`, "member", member.user_id);
 
-    const updated = queryOne(
+    const updated = await queryOne(
       `SELECT pm.id, pm.user_id, pm.role, pm.joined_at, u.name, u.email, u.avatar_url, u.bio
        FROM plan_members pm
        JOIN users u ON pm.user_id = u.id
@@ -81,17 +93,17 @@ router.put("/:planId/members/:memberId", authenticateToken, (req: AuthRequest, r
 });
 
 // Remove Member (Owner only)
-router.delete("/:planId/members/:memberId", authenticateToken, (req: AuthRequest, res: Response) => {
+router.delete("/:planId/members/:memberId", authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.id;
     const { planId, memberId } = req.params;
 
-    const access = getPlanAccess(userId, planId);
+    const access = await getPlanAccess(userId, planId);
     if (!access.isOwner) {
       return res.status(403).json({ error: "Only the Plan Owner can remove members." });
     }
 
-    const member = queryOne<{ id: string; user_id: string; role: string; name: string }>(
+    const member = await queryOne<{ id: string; user_id: string; role: string; name: string }>(
       `SELECT pm.id, pm.user_id, pm.role, u.name 
        FROM plan_members pm
        JOIN users u ON pm.user_id = u.id
@@ -108,13 +120,13 @@ router.delete("/:planId/members/:memberId", authenticateToken, (req: AuthRequest
     }
 
     // Unassign tasks assigned to this user in this plan
-    execute("UPDATE tasks SET assignee_id = NULL WHERE plan_id = ? AND assignee_id = ?", [
+    await execute("UPDATE tasks SET assignee_id = NULL WHERE plan_id = ? AND assignee_id = ?", [
       planId,
       member.user_id,
     ]);
 
-    execute("DELETE FROM plan_members WHERE id = ?", [memberId]);
-    logActivity(planId, userId, "removed_member", `removed ${member.name} from the Plan`, "member", member.user_id);
+    await execute("DELETE FROM plan_members WHERE id = ?", [memberId]);
+    await logActivity(planId, userId, "removed_member", `removed ${member.name} from the Plan`, "member", member.user_id);
 
     res.json({ message: `${member.name} has been removed from the Plan.` });
   } catch (err: any) {

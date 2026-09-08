@@ -11,8 +11,8 @@ import {
 } from "../types";
 import { clientStore } from "./clientStore";
 
-const TOKEN_KEY = "rencanaku_token";
-const CURRENT_USER_ID_KEY = "rencanaku_current_user_id";
+const TOKEN_KEY = "plancraft_token";
+const CURRENT_USER_ID_KEY = "plancraft_current_user_id";
 
 let isStaticMode: boolean | null = null;
 

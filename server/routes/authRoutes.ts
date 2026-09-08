@@ -1,247 +1,53 @@
-import { Router, Response, Request } from "express";
+import { Router, Response } from "express";
 import { queryOne, queryAll, execute } from "../db.js";
 import { hashPassword, comparePassword, generateToken, authenticateToken, AuthRequest } from "../auth.js";
-import jwt from "jsonwebtoken";
 
 const router = Router();
 
-function getAppUrl(): string {
-  return process.env.APP_URL || `http://localhost:${process.env.PORT || 3010}`;
-}
-
-function findOrCreateOAuthUser(email: string, name: string, avatarUrl?: string, provider?: string) {
-  const existing = queryOne<{ id: string; name: string; email: string; avatar_url: string; bio: string }>(
-    "SELECT id, name, email, avatar_url, bio FROM users WHERE LOWER(email) = LOWER(?)",
-    [email]
-  );
-
-  if (existing) {
-    return existing;
-  }
-
-  const id = `oauth_${provider || "oauth"}_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-  const now = new Date().toISOString();
-  const avatar = avatarUrl || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name || email)}`;
-
-  execute(
-    `INSERT INTO users (id, name, email, password_hash, avatar_url, bio, created_at)
-     VALUES (?, ?, ?, '', ?, '', ?)`,
-    [id, name || email.split("@")[0], email.toLowerCase(), avatar, now]
-  );
-
-  return {
-    id,
-    name: name || email.split("@")[0],
-    email: email.toLowerCase(),
-    avatar_url: avatar,
-    bio: "",
-  };
-}
-
-// Google OAuth: Step 1 — Redirect user to Google
-router.get("/oauth/google", (req: Request, res: Response) => {
-  const clientId = process.env.GOOGLE_CLIENT_ID;
-  const appUrl = getAppUrl();
-
-  if (!clientId) {
-    return res.redirect(`${appUrl}?oauth_error=google_not_configured`);
-  }
-
-  const redirectUri = `${appUrl}/api/auth/oauth/google/callback`;
-  const authUrl = new URL("https://accounts.google.com/o/oauth2/v2/auth");
-  authUrl.searchParams.set("client_id", clientId);
-  authUrl.searchParams.set("redirect_uri", redirectUri);
-  authUrl.searchParams.set("response_type", "code");
-  authUrl.searchParams.set("scope", "email profile");
-  authUrl.searchParams.set("access_type", "offline");
-  authUrl.searchParams.set("prompt", "consent");
-
-  res.redirect(authUrl.toString());
-});
-
-// Google OAuth: Step 2 — Handle callback
-router.get("/oauth/google/callback", async (req: Request, res: Response) => {
+// Demo accounts endpoint for rapid evaluation and testing (strictly seeded demo accounts only)
+router.get("/demo-accounts", async (_req, res) => {
   try {
-    const code = req.query.code as string | undefined;
-    const appUrl = getAppUrl();
-
-    if (!code) {
-      return res.redirect(`${appUrl}?oauth_error=missing_code`);
-    }
-
-    const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        code,
-        client_id: process.env.GOOGLE_CLIENT_ID!,
-        client_secret: process.env.GOOGLE_CLIENT_SECRET!,
-        redirect_uri: `${appUrl}/api/auth/oauth/google/callback`,
-        grant_type: "authorization_code",
-      }),
-    });
-
-    const tokenData = await tokenRes.json();
-    if (!tokenData.access_token) {
-      console.error("Google token exchange failed:", tokenData);
-      return res.redirect(`${appUrl}?oauth_error=token_exchange_failed`);
-    }
-
-    const userRes = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
-      headers: { Authorization: `Bearer ${tokenData.access_token}` },
-    });
-
-    const googleUser = await userRes.json();
-    const safeUser = findOrCreateOAuthUser(googleUser.email, googleUser.name, googleUser.picture, "google");
-    const token = generateToken(safeUser);
-
-    res.redirect(302, `${appUrl}/#oauth_token=${token}`);
-  } catch (err: any) {
-    console.error("Google OAuth error:", err);
-    res.redirect(`${getAppUrl()}?oauth_error=${encodeURIComponent(err.message)}`);
-  }
-});
-
-// Apple OAuth: Step 1 — Redirect user to Apple
-router.get("/oauth/apple", (req: Request, res: Response) => {
-  const clientId = process.env.APPLE_CLIENT_ID;
-  const teamId = process.env.APPLE_TEAM_ID;
-  const keyId = process.env.APPLE_KEY_ID;
-  const privateKey = process.env.APPLE_PRIVATE_KEY;
-  const appUrl = getAppUrl();
-
-  if (!clientId || !teamId || !keyId || !privateKey) {
-    return res.redirect(`${appUrl}?oauth_error=apple_not_configured`);
-  }
-
-  // Generate client secret JWT (ES256)
-  const clientSecret = jwt.sign(
-    {
-      iss: teamId,
-      iat: Math.floor(Date.now() / 1000),
-      exp: Math.floor(Date.now() / 1000) + 15 * 60, // 15 minutes
-      aud: "https://appleid.apple.com",
-      sub: `com.rencanaku.service`,
-    },
-    privateKey,
-    {
-      algorithm: "ES256",
-      keyid: keyId,
-    }
-  );
-
-  const redirectUri = `${appUrl}/api/auth/oauth/apple/callback`;
-  const authUrl = new URL("https://appleid.apple.com/auth/authorize");
-  authUrl.searchParams.set("client_id", clientId);
-  authUrl.searchParams.set("redirect_uri", redirectUri);
-  authUrl.searchParams.set("response_type", "code id_token");
-  authUrl.searchParams.set("scope", "name email");
-  authUrl.searchParams.set("response_mode", "query");
-  authUrl.searchParams.set("state", "rencanaku");
-
-  res.redirect(authUrl.toString());
-});
-
-// Apple OAuth: Step 2 — Handle callback
-router.post("/oauth/apple/callback", async (req: Request, res: Response) => {
-  try {
-    const { code, error } = req.query as { code?: string; error?: string };
-    const appUrl = getAppUrl();
-
-    if (error) {
-      return res.redirect(`${appUrl}?oauth_error=${error}`);
-    }
-    if (!code) {
-      // Apple may POST the code in the body
-      const bodyCode = (req.body as any)?.code;
-      if (!bodyCode) {
-        return res.redirect(`${appUrl}?oauth_error=missing_code`);
-      }
-    }
-
-    const codeValue = code || (req.body as any)?.code;
-    const redirectUri = `${appUrl}/api/auth/oauth/apple/callback`;
-
-    // Generate client secret
-    const clientSecret = jwt.sign(
-      {
-        iss: process.env.APPLE_TEAM_ID!,
-        iat: Math.floor(Date.now() / 1000),
-        exp: Math.floor(Date.now() / 1000) + 15 * 60,
-        aud: "https://appleid.apple.com",
-        sub: "com.rencanaku.service",
-      },
-      process.env.APPLE_PRIVATE_KEY!,
-      { algorithm: "ES256", keyid: process.env.APPLE_KEY_ID! }
+    const users = await queryAll<{ id: string; name: string; email: string; avatar_url: string; bio: string; is_demo?: number }>(
+      "SELECT id, name, email, avatar_url, bio, is_demo FROM users WHERE is_demo = 1 ORDER BY name ASC"
     );
-
-    // Exchange code for token
-    const tokenRes = await fetch("https://appleid.apple.com/auth/token", {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        grant_type: "authorization_code",
-        code: codeValue,
-        redirect_uri: redirectUri,
-        client_id: process.env.APPLE_CLIENT_ID!,
-        client_secret: clientSecret,
-      }),
-    });
-
-    const tokenData = await tokenRes.json();
-    if (!tokenData.access_token && !tokenData.id_token) {
-      console.error("Apple token exchange failed:", tokenData);
-      return res.redirect(`${appUrl}?oauth_error=token_exchange_failed`);
-    }
-
-    // Decode user info from id_token
-    const idTokenParts = tokenData.id_token.split(".");
-    const decoded = JSON.parse(Buffer.from(idTokenParts[1], "base64").toString());
-
-    const email = decoded.email || "";
-    const name = decoded.name || email.split("@")[0];
-    const safeUser = findOrCreateOAuthUser(email, name, undefined, "apple");
-    const token = generateToken(safeUser);
-
-    res.redirect(302, `${appUrl}/#oauth_token=${token}`);
-  } catch (err: any) {
-    console.error("Apple OAuth error:", err);
-    res.redirect(`${getAppUrl()}?oauth_error=${encodeURIComponent(err.message)}`);
-  }
-});
-
-// Demo accounts endpoint for rapid evaluation and testing
-router.get("/demo-accounts", (_req, res) => {
-  try {
-    const users = queryAll<{ id: string; name: string; email: string; avatar_url: string; bio: string }>(
-      "SELECT id, name, email, avatar_url, bio FROM users ORDER BY name ASC"
-    );
-    res.json({ users });
+    res.json({ users: users.map(u => ({ ...u, is_demo: true })) });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Quick demo login by email (for instant switcher)
-router.post("/demo-login", (req, res) => {
+// Quick demo login by email (ONLY allowed for designated demo accounts)
+router.post("/demo-login", async (req, res) => {
   try {
     const { email } = req.body;
-    const user = queryOne<{ id: string; name: string; email: string; avatar_url: string; bio: string }>(
-      "SELECT id, name, email, avatar_url, bio FROM users WHERE email = ?",
-      [email]
+    if (!email) {
+      return res.status(400).json({ error: "Email is required." });
+    }
+
+    const user = await queryOne<{ id: string; name: string; email: string; avatar_url: string; bio: string; is_demo?: number }>(
+      "SELECT id, name, email, avatar_url, bio, is_demo FROM users WHERE LOWER(email) = LOWER(?) AND is_demo = 1",
+      [email.trim()]
     );
     if (!user) {
-      return res.status(404).json({ error: "User not found" });
+      return res.status(404).json({ error: "Demo account not found or this is a real user account." });
     }
-    const token = generateToken(user);
-    res.json({ user, token });
+    const safeUser = {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      avatar_url: user.avatar_url,
+      bio: user.bio,
+      is_demo: true,
+    };
+    const token = generateToken(safeUser);
+    res.json({ user: safeUser, token });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Register
-router.post("/register", (req, res) => {
+// Register (ALWAYS registers as a real user with is_demo = 0)
+router.post("/register", async (req, res) => {
   try {
     const { name, email, password, bio, avatar_url } = req.body;
 
@@ -253,7 +59,7 @@ router.post("/register", (req, res) => {
       return res.status(400).json({ error: "Password must be at least 6 characters." });
     }
 
-    const existing = queryOne("SELECT id FROM users WHERE LOWER(email) = LOWER(?)", [email.trim()]);
+    const existing = await queryOne("SELECT id FROM users WHERE LOWER(email) = LOWER(?)", [email.trim()]);
     if (existing) {
       return res.status(409).json({ error: "An account with this email already exists." });
     }
@@ -263,13 +69,21 @@ router.post("/register", (req, res) => {
     const now = new Date().toISOString();
     const avatar = avatar_url || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name)}`;
 
-    execute(
-      `INSERT INTO users (id, name, email, password_hash, avatar_url, bio, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    // Explicitly is_demo = 0 for real users
+    await execute(
+      `INSERT INTO users (id, name, email, password_hash, avatar_url, bio, is_demo, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, 0, ?)`,
       [id, name.trim(), email.trim().toLowerCase(), password_hash, avatar, bio || "", now]
     );
 
-    const newUser = { id, name: name.trim(), email: email.trim().toLowerCase(), avatar_url: avatar, bio: bio || "" };
+    const newUser = {
+      id,
+      name: name.trim(),
+      email: email.trim().toLowerCase(),
+      avatar_url: avatar,
+      bio: bio || "",
+      is_demo: false,
+    };
     const token = generateToken(newUser);
 
     res.status(201).json({ user: newUser, token });
@@ -279,7 +93,7 @@ router.post("/register", (req, res) => {
 });
 
 // Login
-router.post("/login", (req, res) => {
+router.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;
 
@@ -287,14 +101,15 @@ router.post("/login", (req, res) => {
       return res.status(400).json({ error: "Email and password are required." });
     }
 
-    const user = queryOne<{
+    const user = await queryOne<{
       id: string;
       name: string;
       email: string;
       password_hash: string;
       avatar_url: string;
       bio: string;
-    }>("SELECT id, name, email, password_hash, avatar_url, bio FROM users WHERE LOWER(email) = LOWER(?)", [
+      is_demo?: number;
+    }>("SELECT id, name, email, password_hash, avatar_url, bio, is_demo FROM users WHERE LOWER(email) = LOWER(?)", [
       email.trim(),
     ]);
 
@@ -308,6 +123,7 @@ router.post("/login", (req, res) => {
       email: user.email,
       avatar_url: user.avatar_url,
       bio: user.bio,
+      is_demo: Boolean(user.is_demo),
     };
 
     const token = generateToken(safeUser);
@@ -324,7 +140,7 @@ router.get("/me", authenticateToken, (req: AuthRequest, res: Response) => {
 });
 
 // Update Profile
-router.put("/profile", authenticateToken, (req: AuthRequest, res: Response) => {
+router.put("/profile", authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.id;
     const { name, avatar_url, bio } = req.body;
@@ -333,24 +149,26 @@ router.put("/profile", authenticateToken, (req: AuthRequest, res: Response) => {
       return res.status(400).json({ error: "Name cannot be empty." });
     }
 
-    execute(
+    await execute(
       "UPDATE users SET name = ?, avatar_url = ?, bio = ? WHERE id = ?",
       [name.trim(), avatar_url || null, bio || "", userId]
     );
 
-    const updatedUser = queryOne<{ id: string; name: string; email: string; avatar_url: string; bio: string }>(
-      "SELECT id, name, email, avatar_url, bio FROM users WHERE id = ?",
+    const updatedUser = await queryOne<{ id: string; name: string; email: string; avatar_url: string; bio: string; is_demo?: number }>(
+      "SELECT id, name, email, avatar_url, bio, is_demo FROM users WHERE id = ?",
       [userId]
     );
 
-    res.json({ user: updatedUser });
+    res.json({
+      user: updatedUser ? { ...updatedUser, is_demo: Boolean(updatedUser.is_demo) } : null,
+    });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
 
 // Change Password
-router.put("/password", authenticateToken, (req: AuthRequest, res: Response) => {
+router.put("/password", authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.id;
     const { currentPassword, newPassword } = req.body;
@@ -363,7 +181,7 @@ router.put("/password", authenticateToken, (req: AuthRequest, res: Response) => 
       return res.status(400).json({ error: "New password must be at least 6 characters." });
     }
 
-    const user = queryOne<{ password_hash: string }>(
+    const user = await queryOne<{ password_hash: string }>(
       "SELECT password_hash FROM users WHERE id = ?",
       [userId]
     );
@@ -373,7 +191,7 @@ router.put("/password", authenticateToken, (req: AuthRequest, res: Response) => 
     }
 
     const newHash = hashPassword(newPassword);
-    execute("UPDATE users SET password_hash = ? WHERE id = ?", [newHash, userId]);
+    await execute("UPDATE users SET password_hash = ? WHERE id = ?", [newHash, userId]);
 
     res.json({ message: "Password updated successfully." });
   } catch (err: any) {
@@ -382,27 +200,31 @@ router.put("/password", authenticateToken, (req: AuthRequest, res: Response) => 
 });
 
 // Search users to invite to a plan
-router.get("/search", authenticateToken, (req: AuthRequest, res: Response) => {
+router.get("/search", authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const query = (req.query.q as string || "").trim().toLowerCase();
     const currentUserId = req.user!.id;
 
     if (!query) {
-      const recentUsers = queryAll<{ id: string; name: string; email: string; avatar_url: string }>(
-        "SELECT id, name, email, avatar_url FROM users WHERE id != ? LIMIT 8",
+      const recentUsers = await queryAll<{ id: string; name: string; email: string; avatar_url: string; is_demo?: number }>(
+        "SELECT id, name, email, avatar_url, is_demo FROM users WHERE id != ? LIMIT 8",
         [currentUserId]
       );
-      return res.json({ users: recentUsers });
+      return res.json({
+        users: recentUsers.map(u => ({ ...u, is_demo: Boolean(u.is_demo) }))
+      });
     }
 
-    const users = queryAll<{ id: string; name: string; email: string; avatar_url: string }>(
-      `SELECT id, name, email, avatar_url FROM users 
+    const users = await queryAll<{ id: string; name: string; email: string; avatar_url: string; is_demo?: number }>(
+      `SELECT id, name, email, avatar_url, is_demo FROM users 
        WHERE id != ? AND (LOWER(name) LIKE ? OR LOWER(email) LIKE ?) 
        LIMIT 10`,
       [currentUserId, `%${query}%`, `%${query}%`]
     );
 
-    res.json({ users });
+    res.json({
+      users: users.map(u => ({ ...u, is_demo: Boolean(u.is_demo) }))
+    });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

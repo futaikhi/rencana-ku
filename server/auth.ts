@@ -3,7 +3,7 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import { queryOne } from "./db.js";
 
-const JWT_SECRET = process.env.JWT_SECRET || "rencanaku-super-secure-jwt-secret-key";
+const JWT_SECRET = process.env.JWT_SECRET || "plancraft-super-secure-jwt-secret-key";
 
 export interface AuthenticatedUser {
   id: string;
@@ -11,6 +11,7 @@ export interface AuthenticatedUser {
   email: string;
   avatar_url?: string;
   bio?: string;
+  is_demo?: boolean;
 }
 
 export interface AuthRequest extends Request {
@@ -33,7 +34,7 @@ export function generateToken(user: AuthenticatedUser): string {
   );
 }
 
-export function authenticateToken(req: AuthRequest, res: Response, next: NextFunction) {
+export async function authenticateToken(req: AuthRequest, res: Response, next: NextFunction) {
   const authHeader = req.headers["authorization"];
   const token = authHeader && authHeader.startsWith("Bearer ") ? authHeader.split(" ")[1] : null;
 
@@ -43,16 +44,30 @@ export function authenticateToken(req: AuthRequest, res: Response, next: NextFun
 
   try {
     const payload = jwt.verify(token, JWT_SECRET) as { id: string; email: string };
-    const user = queryOne<AuthenticatedUser>(
-      "SELECT id, name, email, avatar_url, bio FROM users WHERE id = ?",
+    const rawUser = await queryOne<{
+      id: string;
+      name: string;
+      email: string;
+      avatar_url?: string;
+      bio?: string;
+      is_demo?: number | boolean;
+    }>(
+      "SELECT id, name, email, avatar_url, bio, is_demo FROM users WHERE id = ?",
       [payload.id]
     );
 
-    if (!user) {
+    if (!rawUser) {
       return res.status(401).json({ error: "User no longer exists." });
     }
 
-    req.user = user;
+    req.user = {
+      id: rawUser.id,
+      name: rawUser.name,
+      email: rawUser.email,
+      avatar_url: rawUser.avatar_url,
+      bio: rawUser.bio,
+      is_demo: Boolean(rawUser.is_demo),
+    };
     next();
   } catch (err) {
     return res.status(401).json({ error: "Invalid or expired session token." });

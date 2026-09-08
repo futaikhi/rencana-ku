@@ -11,6 +11,7 @@ export interface User {
   email: string;
   avatar_url?: string;
   bio?: string;
+  is_demo?: boolean;
 }
 
 export interface PlanMember {
@@ -22,6 +23,7 @@ export interface PlanMember {
   email?: string;
   avatar_url?: string;
   bio?: string;
+  is_demo?: boolean;
 }
 
 export interface PlanStats {
@@ -46,7 +48,7 @@ export interface Plan {
   category: string;
   icon?: string;
   color?: string;
-  target_date?: string | null;
+  target_date?: string;
   budget_enabled: boolean;
   budget_target?: number;
   notes?: string;
@@ -73,9 +75,6 @@ export interface Task {
   assignee_id?: string | null;
   assignee_name?: string;
   assignee_avatar?: string;
-  plan_name?: string;
-  plan_color?: string;
-  plan_icon?: string;
   created_by: string;
   sort_order: number;
   created_at: string;
@@ -95,9 +94,6 @@ export interface Milestone {
   totalTasks?: number;
   completedTasks?: number;
   taskProgress?: number;
-  plan_name?: string;
-  plan_color?: string;
-  plan_icon?: string;
 }
 
 export interface BudgetItem {

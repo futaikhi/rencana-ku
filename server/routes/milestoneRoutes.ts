@@ -6,12 +6,12 @@ import { getPlanAccess, logActivity } from "../authorization.js";
 const router = Router({ mergeParams: true });
 
 // Create Milestone
-router.post("/:planId/milestones", authenticateToken, (req: AuthRequest, res: Response) => {
+router.post("/:planId/milestones", authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.id;
     const planId = req.params.planId;
 
-    const access = getPlanAccess(userId, planId);
+    const access = await getPlanAccess(userId, planId);
     if (!access.canEdit) {
       return res.status(403).json({ error: "Permission denied. Only Owners and Editors can add milestones." });
     }
@@ -25,7 +25,7 @@ router.post("/:planId/milestones", authenticateToken, (req: AuthRequest, res: Re
     const milestoneId = `ms_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     const now = new Date().toISOString();
 
-    execute(
+    await execute(
       `INSERT INTO milestones (id, plan_id, title, description, target_date, status, sort_order, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
@@ -41,10 +41,10 @@ router.post("/:planId/milestones", authenticateToken, (req: AuthRequest, res: Re
       ]
     );
 
-    execute("UPDATE plans SET updated_at = ? WHERE id = ?", [now, planId]);
-    logActivity(planId, userId, "created_milestone", `added milestone "${title.trim()}"`, "milestone", milestoneId);
+    await execute("UPDATE plans SET updated_at = ? WHERE id = ?", [now, planId]);
+    await logActivity(planId, userId, "created_milestone", `added milestone "${title.trim()}"`, "milestone", milestoneId);
 
-    const milestone = queryOne("SELECT * FROM milestones WHERE id = ?", [milestoneId]);
+    const milestone = await queryOne("SELECT * FROM milestones WHERE id = ?", [milestoneId]);
     res.status(201).json({ milestone });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -52,12 +52,12 @@ router.post("/:planId/milestones", authenticateToken, (req: AuthRequest, res: Re
 });
 
 // Update Milestone
-router.put("/:planId/milestones/:milestoneId", authenticateToken, (req: AuthRequest, res: Response) => {
+router.put("/:planId/milestones/:milestoneId", authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.id;
     const { planId, milestoneId } = req.params;
 
-    const access = getPlanAccess(userId, planId);
+    const access = await getPlanAccess(userId, planId);
     if (!access.canEdit) {
       return res.status(403).json({ error: "Permission denied." });
     }
@@ -68,7 +68,7 @@ router.put("/:planId/milestones/:milestoneId", authenticateToken, (req: AuthRequ
       return res.status(400).json({ error: "Milestone title cannot be empty." });
     }
 
-    const existing = queryOne<{ id: string; status: string; title: string }>(
+    const existing = await queryOne<{ id: string; status: string; title: string }>(
       "SELECT id, status, title FROM milestones WHERE id = ? AND plan_id = ?",
       [milestoneId, planId]
     );
@@ -79,7 +79,7 @@ router.put("/:planId/milestones/:milestoneId", authenticateToken, (req: AuthRequ
 
     const now = new Date().toISOString();
 
-    execute(
+    await execute(
       `UPDATE milestones 
        SET title = ?, description = ?, target_date = ?, status = ?, sort_order = ?, updated_at = ?
        WHERE id = ? AND plan_id = ?`,
@@ -95,19 +95,19 @@ router.put("/:planId/milestones/:milestoneId", authenticateToken, (req: AuthRequ
       ]
     );
 
-    execute("UPDATE plans SET updated_at = ? WHERE id = ?", [now, planId]);
+    await execute("UPDATE plans SET updated_at = ? WHERE id = ?", [now, planId]);
 
     if (existing.status !== status) {
       if (status === "COMPLETED") {
-        logActivity(planId, userId, "completed_milestone", `achieved milestone "${title.trim()}"`, "milestone", milestoneId);
+        await logActivity(planId, userId, "completed_milestone", `achieved milestone "${title.trim()}"`, "milestone", milestoneId);
       } else {
-        logActivity(planId, userId, "reopened_milestone", `reopened milestone "${title.trim()}"`, "milestone", milestoneId);
+        await logActivity(planId, userId, "reopened_milestone", `reopened milestone "${title.trim()}"`, "milestone", milestoneId);
       }
     } else {
-      logActivity(planId, userId, "updated_milestone", `updated milestone "${title.trim()}"`, "milestone", milestoneId);
+      await logActivity(planId, userId, "updated_milestone", `updated milestone "${title.trim()}"`, "milestone", milestoneId);
     }
 
-    const updatedMilestone = queryOne("SELECT * FROM milestones WHERE id = ?", [milestoneId]);
+    const updatedMilestone = await queryOne("SELECT * FROM milestones WHERE id = ?", [milestoneId]);
     res.json({ milestone: updatedMilestone });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -115,17 +115,17 @@ router.put("/:planId/milestones/:milestoneId", authenticateToken, (req: AuthRequ
 });
 
 // Toggle Milestone
-router.patch("/:planId/milestones/:milestoneId/toggle", authenticateToken, (req: AuthRequest, res: Response) => {
+router.patch("/:planId/milestones/:milestoneId/toggle", authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.id;
     const { planId, milestoneId } = req.params;
 
-    const access = getPlanAccess(userId, planId);
+    const access = await getPlanAccess(userId, planId);
     if (!access.canEdit) {
       return res.status(403).json({ error: "Permission denied." });
     }
 
-    const milestone = queryOne<{ id: string; status: string; title: string }>(
+    const milestone = await queryOne<{ id: string; status: string; title: string }>(
       "SELECT id, status, title FROM milestones WHERE id = ? AND plan_id = ?",
       [milestoneId, planId]
     );
@@ -137,16 +137,16 @@ router.patch("/:planId/milestones/:milestoneId/toggle", authenticateToken, (req:
     const nextStatus = milestone.status === "COMPLETED" ? "PENDING" : "COMPLETED";
     const now = new Date().toISOString();
 
-    execute("UPDATE milestones SET status = ?, updated_at = ? WHERE id = ?", [nextStatus, now, milestoneId]);
-    execute("UPDATE plans SET updated_at = ? WHERE id = ?", [now, planId]);
+    await execute("UPDATE milestones SET status = ?, updated_at = ? WHERE id = ?", [nextStatus, now, milestoneId]);
+    await execute("UPDATE plans SET updated_at = ? WHERE id = ?", [now, planId]);
 
     if (nextStatus === "COMPLETED") {
-      logActivity(planId, userId, "completed_milestone", `achieved milestone "${milestone.title}"`, "milestone", milestoneId);
+      await logActivity(planId, userId, "completed_milestone", `achieved milestone "${milestone.title}"`, "milestone", milestoneId);
     } else {
-      logActivity(planId, userId, "reopened_milestone", `reopened milestone "${milestone.title}"`, "milestone", milestoneId);
+      await logActivity(planId, userId, "reopened_milestone", `reopened milestone "${milestone.title}"`, "milestone", milestoneId);
     }
 
-    const updated = queryOne("SELECT * FROM milestones WHERE id = ?", [milestoneId]);
+    const updated = await queryOne("SELECT * FROM milestones WHERE id = ?", [milestoneId]);
     res.json({ milestone: updated });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -154,17 +154,17 @@ router.patch("/:planId/milestones/:milestoneId/toggle", authenticateToken, (req:
 });
 
 // Delete Milestone
-router.delete("/:planId/milestones/:milestoneId", authenticateToken, (req: AuthRequest, res: Response) => {
+router.delete("/:planId/milestones/:milestoneId", authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.id;
     const { planId, milestoneId } = req.params;
 
-    const access = getPlanAccess(userId, planId);
+    const access = await getPlanAccess(userId, planId);
     if (!access.canEdit) {
       return res.status(403).json({ error: "Permission denied." });
     }
 
-    const milestone = queryOne<{ title: string }>(
+    const milestone = await queryOne<{ title: string }>(
       "SELECT title FROM milestones WHERE id = ? AND plan_id = ?",
       [milestoneId, planId]
     );
@@ -174,10 +174,10 @@ router.delete("/:planId/milestones/:milestoneId", authenticateToken, (req: AuthR
     }
 
     // Detach any tasks referencing this milestone
-    execute("UPDATE tasks SET milestone_id = NULL WHERE milestone_id = ?", [milestoneId]);
-    execute("DELETE FROM milestones WHERE id = ? AND plan_id = ?", [milestoneId, planId]);
+    await execute("UPDATE tasks SET milestone_id = NULL WHERE milestone_id = ?", [milestoneId]);
+    await execute("DELETE FROM milestones WHERE id = ? AND plan_id = ?", [milestoneId, planId]);
 
-    logActivity(planId, userId, "deleted_milestone", `deleted milestone "${milestone.title}"`, "milestone", milestoneId);
+    await logActivity(planId, userId, "deleted_milestone", `deleted milestone "${milestone.title}"`, "milestone", milestoneId);
 
     res.json({ message: "Milestone deleted successfully." });
   } catch (err: any) {

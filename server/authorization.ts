@@ -12,8 +12,8 @@ export interface PlanAccess {
   canManage: boolean;
 }
 
-export function getPlanAccess(userId: string, planId: string): PlanAccess {
-  const plan = queryOne<{ id: string; owner_id: string }>(
+export async function getPlanAccess(userId: string, planId: string): Promise<PlanAccess> {
+  const plan = await queryOne<{ id: string; owner_id: string }>(
     "SELECT id, owner_id FROM plans WHERE id = ?",
     [planId]
   );
@@ -44,7 +44,7 @@ export function getPlanAccess(userId: string, planId: string): PlanAccess {
   }
 
   // Check membership in plan_members
-  const member = queryOne<{ role: string }>(
+  const member = await queryOne<{ role: string }>(
     "SELECT role FROM plan_members WHERE plan_id = ? AND user_id = ?",
     [planId, userId]
   );
@@ -77,18 +77,18 @@ export function getPlanAccess(userId: string, planId: string): PlanAccess {
   };
 }
 
-export function logActivity(
+export async function logActivity(
   planId: string,
   actorId: string,
   action: string,
   details: string,
   entityType?: string,
   entityId?: string
-) {
+): Promise<void> {
   try {
     const id = `act_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     const now = new Date().toISOString();
-    execute(
+    await execute(
       `INSERT INTO activities (id, plan_id, actor_id, action, details, entity_type, entity_id, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [id, planId, actorId, action, details, entityType || null, entityId || null, now]
