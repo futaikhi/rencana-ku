@@ -10,7 +10,7 @@ interface AuthModalProps {
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
-  const { login, register, demoUsers, demoLogin } = useAuth();
+  const { login, register } = useAuth();
   const { showSuccess, showError } = useToast();
   const [isRegister, setIsRegister] = useState(false);
   const [name, setName] = useState("");
@@ -64,49 +64,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
       maxWidth="md"
     >
       <div>
-        {/* Quick Demo Switcher banner for reviewers */}
-        <div className="mb-5 p-3.5 bg-amber-50 border-2 border-black rounded-2xl shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
-          <div className="flex items-center justify-between mb-1.5">
-            <p className="text-[10px] font-black uppercase tracking-wider text-amber-950 flex items-center space-x-1.5">
-              <span>Quick 1-Click Demo Login</span>
-              <span className="px-1.5 py-0.2 bg-amber-300 text-black border border-black rounded text-[8px] font-black uppercase">
-                Sandbox
-              </span>
-            </p>
-          </div>
-          <p className="text-[11px] text-amber-900/80 mb-2 leading-tight">
-            Use pre-configured demo profiles to preview team collaboration without registering:
-          </p>
-          <div className="flex flex-wrap gap-1.5">
-            {demoUsers.map((u) => (
-              <button
-                key={u.id}
-                type="button"
-                onClick={async () => {
-                  try {
-                    await demoLogin(u.email);
-                    showSuccess(`Logged in as ${u.name}!`, "Demo Account");
-                    onClose();
-                  } catch (err: any) {
-                    showError(err.message || "Failed to login to demo account.", "Login Failed");
-                  }
-                }}
-                className="px-2.5 py-1 text-xs bg-white hover:bg-[#E0FF62] border-2 border-black rounded-full font-black text-black shadow-[1px_1px_0px_0px_rgba(0,0,0,1)] transition-all flex items-center space-x-1.5"
-              >
-                <span>{u.name}</span>
-                <span className="text-[9px] font-bold text-black/60 bg-amber-200 px-1 rounded">Demo</span>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {error && (
-          <div className="mb-4 p-3 bg-[#FFE4E6] border-2 border-black rounded-2xl flex items-start space-x-2 text-[#E11D48] text-xs font-bold shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
-            <AlertCircle size={16} className="shrink-0 mt-0.5 stroke-[2.5]" />
-            <span>{error}</span>
-          </div>
-        )}
-
         <form onSubmit={handleSubmit} className="space-y-4">
           {isRegister && (
             <div>
@@ -173,7 +130,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
           {isRegister && (
             <div className="p-2.5 bg-[#FAF8F5] border-2 border-black/30 rounded-xl text-center">
               <p className="text-[11px] text-black/70 font-medium leading-tight">
-                Creating a <strong className="text-black font-black">Real Account</strong>. Your profile and plans remain distinct and will never be mixed into demo profiles.
+                Create your account to manage your own plans and collaborate with other registered users.
               </p>
             </div>
           )}

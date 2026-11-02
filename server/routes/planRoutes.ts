@@ -20,8 +20,8 @@ async function enrichPlanWithProgress(plan: any, userId: string) {
     "SELECT estimated_amount, actual_amount FROM budget_items WHERE plan_id = ?",
     [planId]
   );
-  const members = await queryAll<{ id: string; user_id: string; role: string; name: string; avatar_url: string; is_demo?: number }>(
-    `SELECT pm.id, pm.user_id, pm.role, u.name, u.avatar_url, u.is_demo 
+  const members = await queryAll<{ id: string; user_id: string; role: string; name: string; avatar_url: string }>(
+    `SELECT pm.id, pm.user_id, pm.role, u.name, u.avatar_url
      FROM plan_members pm
      JOIN users u ON pm.user_id = u.id
      WHERE pm.plan_id = ?
@@ -289,16 +289,15 @@ router.get("/:id", authenticateToken, async (req: AuthRequest, res: Response) =>
       email: string;
       avatar_url: string;
       bio: string;
-      is_demo?: number;
     }>(
-      `SELECT pm.id, pm.user_id, pm.role, pm.joined_at, u.name, u.email, u.avatar_url, u.bio, u.is_demo
+      `SELECT pm.id, pm.user_id, pm.role, pm.joined_at, u.name, u.email, u.avatar_url, u.bio
        FROM plan_members pm
        JOIN users u ON pm.user_id = u.id
        WHERE pm.plan_id = ?
        ORDER BY CASE pm.role WHEN 'OWNER' THEN 1 WHEN 'EDITOR' THEN 2 ELSE 3 END, u.name ASC`,
       [planId]
     );
-    const members = rawMembers.map(m => ({ ...m, is_demo: Boolean(m.is_demo) }));
+    const members = rawMembers;
 
     // Fetch Pending Invitations for this Plan (for owners/editors)
     const invitations = access.canEdit
@@ -371,8 +370,8 @@ router.put("/:id", authenticateToken, async (req: AuthRequest, res: Response) =>
     const targetBudget = Number(budget_target) || 0;
 
     await execute(
-      `UPDATE plans 
-       SET name = ?, description = ?, category = ?, icon = ?, color = ?, target_date = ?, 
+      `UPDATE plans
+       SET name = ?, description = ?, category = ?, icon = ?, color = ?, target_date = ?,
            budget_enabled = ?, budget_target = ?, updated_at = ?
        WHERE id = ?`,
       [

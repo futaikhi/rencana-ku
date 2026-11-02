@@ -6,10 +6,8 @@ interface AuthContextType {
   user: User | null;
   token: string | null;
   loading: boolean;
-  demoUsers: User[];
   pendingInvitations: PlanInvitation[];
   login: (email: string, password: string) => Promise<void>;
-  demoLogin: (email: string) => Promise<void>;
   register: (data: { name: string; email: string; password: string; bio?: string }) => Promise<void>;
   logout: () => void;
   updateProfile: (data: { name: string; bio?: string; avatar_url?: string }) => Promise<void>;
@@ -23,18 +21,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [token, setTokenState] = useState<string | null>(getToken());
   const [loading, setLoading] = useState(true);
-  const [demoUsers, setDemoUsers] = useState<User[]>([]);
   const [pendingInvitations, setPendingInvitations] = useState<PlanInvitation[]>([]);
-
-  // Fetch demo accounts list
-  const loadDemoAccounts = async () => {
-    try {
-      const res = await api.getDemoAccounts();
-      setDemoUsers(res.users);
-    } catch (e) {
-      console.error("Failed to load demo accounts", e);
-    }
-  };
 
   const refreshInvitations = async () => {
     if (!getToken()) return;
@@ -47,7 +34,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
-    loadDemoAccounts();
     const initAuth = async () => {
       const currentToken = getToken();
       if (!currentToken) {
@@ -81,23 +67,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await refreshInvitations();
   };
 
-  const demoLogin = async (email: string) => {
-    setLoading(true);
-    try {
-      const res = await api.demoLogin(email);
-      setUser(res.user);
-      setTokenState(res.token);
-      await refreshInvitations();
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const register = async (data: { name: string; email: string; password: string; bio?: string }) => {
     const res = await api.register(data);
     setUser(res.user);
     setTokenState(res.token);
-    // Real registered users are strictly separated from demo accounts
     await refreshInvitations();
   };
 
@@ -125,10 +98,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         user,
         token,
         loading,
-        demoUsers,
         pendingInvitations,
         login,
-        demoLogin,
         register,
         logout,
         updateProfile,

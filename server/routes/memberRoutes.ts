@@ -25,9 +25,8 @@ router.get("/:planId/members", authenticateToken, async (req: AuthRequest, res: 
       email: string;
       avatar_url: string;
       bio: string;
-      is_demo?: number;
     }>(
-      `SELECT pm.id, pm.user_id, pm.role, pm.joined_at, u.name, u.email, u.avatar_url, u.bio, u.is_demo
+      `SELECT pm.id, pm.user_id, pm.role, pm.joined_at, u.name, u.email, u.avatar_url, u.bio
        FROM plan_members pm
        JOIN users u ON pm.user_id = u.id
        WHERE pm.plan_id = ?
@@ -35,7 +34,7 @@ router.get("/:planId/members", authenticateToken, async (req: AuthRequest, res: 
       [planId]
     );
 
-    const members = rawMembers.map(m => ({ ...m, is_demo: Boolean(m.is_demo) }));
+    const members = rawMembers;
 
     res.json({ members, access });
   } catch (err: any) {

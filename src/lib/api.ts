@@ -113,14 +113,6 @@ async function request<T>(
 
 export const api = {
   // Auth
-  async getDemoAccounts(): Promise<{ users: User[] }> {
-    return request<{ users: User[] }>(
-      "/api/auth/demo-accounts",
-      {},
-      () => clientStore.getDemoAccounts()
-    );
-  },
-
   async login(email: string, password: string): Promise<{ user: User; token: string }> {
     const res = await request<{ user: User; token: string }>(
       "/api/auth/login",
@@ -129,20 +121,6 @@ export const api = {
         body: JSON.stringify({ email, password }),
       },
       () => clientStore.login(email, password)
-    );
-    setToken(res.token);
-    setCurrentUserId(res.user.id);
-    return res;
-  },
-
-  async demoLogin(email: string): Promise<{ user: User; token: string }> {
-    const res = await request<{ user: User; token: string }>(
-      "/api/auth/demo-login",
-      {
-        method: "POST",
-        body: JSON.stringify({ email }),
-      },
-      () => clientStore.demoLogin(email)
     );
     setToken(res.token);
     setCurrentUserId(res.user.id);

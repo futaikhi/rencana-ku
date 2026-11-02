@@ -11,7 +11,6 @@ export interface AuthenticatedUser {
   email: string;
   avatar_url?: string;
   bio?: string;
-  is_demo?: boolean;
 }
 
 export interface AuthRequest extends Request {
@@ -50,9 +49,8 @@ export async function authenticateToken(req: AuthRequest, res: Response, next: N
       email: string;
       avatar_url?: string;
       bio?: string;
-      is_demo?: number | boolean;
     }>(
-      "SELECT id, name, email, avatar_url, bio, is_demo FROM users WHERE id = ?",
+      "SELECT id, name, email, avatar_url, bio FROM users WHERE id = ?",
       [payload.id]
     );
 
@@ -66,7 +64,6 @@ export async function authenticateToken(req: AuthRequest, res: Response, next: N
       email: rawUser.email,
       avatar_url: rawUser.avatar_url,
       bio: rawUser.bio,
-      is_demo: Boolean(rawUser.is_demo),
     };
     next();
   } catch (err) {

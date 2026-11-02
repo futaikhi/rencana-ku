@@ -26,10 +26,9 @@ interface LandingViewProps {
 }
 
 export const LandingView: React.FC<LandingViewProps> = () => {
-  const { login, register, demoUsers, demoLogin } = useAuth();
+  const { login, register } = useAuth();
 
-  // Auth mode: "login" | "register" | "demo"
-  const [authMode, setAuthMode] = useState<"login" | "register" | "demo">("login");
+  const [authMode, setAuthMode] = useState<"login" | "register">("login");
 
   // Form State
   const [name, setName] = useState("");
@@ -63,17 +62,6 @@ export const LandingView: React.FC<LandingViewProps> = () => {
     }
   };
 
-  const handleDemoSelect = async (demoEmail: string) => {
-    setError(null);
-    setLoading(true);
-    try {
-      await demoLogin(demoEmail);
-    } catch (err: any) {
-      setError(err.message || "Failed to log in with demo account.");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   return (
     <div className="min-h-screen bg-[#FAF8F5] text-black flex flex-col font-sans selection:bg-[#E0FF62] selection:text-black">
@@ -85,19 +73,6 @@ export const LandingView: React.FC<LandingViewProps> = () => {
           {/* Quick Actions */}
           <div className="flex items-center space-x-2">
             <PWAInstallButton variant="pill" showAlways />
-
-            <button
-              type="button"
-              onClick={() => {
-                setAuthMode("demo");
-                const authCard = document.getElementById("auth-section");
-                authCard?.scrollIntoView({ behavior: "smooth" });
-              }}
-              className="hidden sm:inline-flex items-center space-x-1.5 px-3.5 py-1.5 bg-[#F0F0F0] hover:bg-[#E0FF62] text-xs font-black uppercase tracking-wider text-black border-2 border-black rounded-full shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-x-0.5 active:translate-y-0.5 transition-all"
-            >
-              <Zap size={14} className="stroke-[2.5]" />
-              <span>1-Tap Demo</span>
-            </button>
 
             <button
               type="button"
@@ -264,20 +239,6 @@ export const LandingView: React.FC<LandingViewProps> = () => {
             >
               Register
             </button>
-            <button
-              type="button"
-              onClick={() => {
-                setAuthMode("demo");
-                setError(null);
-              }}
-              className={`flex-1 py-2 text-xs font-black uppercase tracking-wider rounded-xl transition-all ${
-                authMode === "demo"
-                  ? "bg-[#E0FF62] text-black border-2 border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
-                  : "text-black/60 hover:text-black"
-              }`}
-            >
-              ⚡ Demo
-            </button>
           </div>
 
           {/* Error Message */}
@@ -288,44 +249,7 @@ export const LandingView: React.FC<LandingViewProps> = () => {
             </div>
           )}
 
-          {/* 1-Tap Demo Tab */}
-          {authMode === "demo" ? (
-            <div className="space-y-4">
-              <div className="p-3 bg-[#FAF8F5] border-2 border-black rounded-2xl">
-                <h3 className="text-xs font-black uppercase tracking-wider text-black mb-1">
-                  Instant 1-Tap Demo Access
-                </h3>
-                <p className="text-xs text-black/70 font-medium">
-                  Select any test profile below to jump straight into pre-populated collaborative workspaces:
-                </p>
-              </div>
-
-              <div className="space-y-2.5">
-                {demoUsers.map((u) => (
-                  <button
-                    key={u.id}
-                    type="button"
-                    disabled={loading}
-                    onClick={() => handleDemoSelect(u.email)}
-                    className="w-full p-3 bg-white hover:bg-[#E0FF62] border-2 border-black rounded-2xl shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] active:translate-x-0.5 active:translate-y-0.5 transition-all flex items-center justify-between text-left group"
-                  >
-                    <div className="flex items-center space-x-3">
-                      <UserAvatar name={u.name} size="md" />
-                      <div>
-                        <p className="text-xs font-black uppercase text-black group-hover:text-black">
-                          {u.name}
-                        </p>
-                        <p className="text-[11px] text-black/60 font-medium">{u.email}</p>
-                      </div>
-                    </div>
-                    <ArrowRight size={16} className="stroke-[2.5] text-black group-hover:translate-x-1 transition-transform" />
-                  </button>
-                ))}
-              </div>
-            </div>
-          ) : (
-            /* Login & Register Forms */
-            <form onSubmit={handleSubmit} className="space-y-3.5">
+          <form onSubmit={handleSubmit} className="space-y-3.5">
               {authMode === "register" && (
                 <div>
                   <label className="block text-xs font-black uppercase tracking-wider text-black mb-1">
@@ -407,20 +331,7 @@ export const LandingView: React.FC<LandingViewProps> = () => {
                 <span>{loading ? "Processing..." : authMode === "register" ? "Create Free Account" : "Sign In to PlanCraft"}</span>
                 <ArrowRight size={16} className="stroke-[2.5]" />
               </button>
-
-              {/* Quick 1-Tap Demo Switch Link */}
-              <div className="pt-2 text-center">
-                <button
-                  type="button"
-                  onClick={() => setAuthMode("demo")}
-                  className="text-xs text-black font-black uppercase tracking-wider hover:underline flex items-center justify-center space-x-1 mx-auto"
-                >
-                  <Zap size={13} className="stroke-[2.5] text-black" />
-                  <span>Or test with 1-click Demo Account</span>
-                </button>
-              </div>
-            </form>
-          )}
+          </form>
         </div>
       </section>
 

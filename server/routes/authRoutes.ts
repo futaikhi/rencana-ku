@@ -4,49 +4,6 @@ import { hashPassword, comparePassword, generateToken, authenticateToken, AuthRe
 
 const router = Router();
 
-// Demo accounts endpoint for rapid evaluation and testing (strictly seeded demo accounts only)
-router.get("/demo-accounts", async (_req, res) => {
-  try {
-    const users = await queryAll<{ id: string; name: string; email: string; avatar_url: string; bio: string; is_demo?: number }>(
-      "SELECT id, name, email, avatar_url, bio, is_demo FROM users WHERE is_demo = 1 ORDER BY name ASC"
-    );
-    res.json({ users: users.map(u => ({ ...u, is_demo: true })) });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// Quick demo login by email (ONLY allowed for designated demo accounts)
-router.post("/demo-login", async (req, res) => {
-  try {
-    const { email } = req.body;
-    if (!email) {
-      return res.status(400).json({ error: "Email is required." });
-    }
-
-    const user = await queryOne<{ id: string; name: string; email: string; avatar_url: string; bio: string; is_demo?: number }>(
-      "SELECT id, name, email, avatar_url, bio, is_demo FROM users WHERE LOWER(email) = LOWER(?) AND is_demo = 1",
-      [email.trim()]
-    );
-    if (!user) {
-      return res.status(404).json({ error: "Demo account not found or this is a real user account." });
-    }
-    const safeUser = {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      avatar_url: user.avatar_url,
-      bio: user.bio,
-      is_demo: true,
-    };
-    const token = generateToken(safeUser);
-    res.json({ user: safeUser, token });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// Register (ALWAYS registers as a real user with is_demo = 0)
 router.post("/register", async (req, res) => {
   try {
     const { name, email, password, bio, avatar_url } = req.body;
@@ -69,10 +26,9 @@ router.post("/register", async (req, res) => {
     const now = new Date().toISOString();
     const avatar = avatar_url || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name)}`;
 
-    // Explicitly is_demo = 0 for real users
     await execute(
-      `INSERT INTO users (id, name, email, password_hash, avatar_url, bio, is_demo, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, 0, ?)`,
+      `INSERT INTO users (id, name, email, password_hash, avatar_url, bio, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [id, name.trim(), email.trim().toLowerCase(), password_hash, avatar, bio || "", now]
     );
 
@@ -82,7 +38,6 @@ router.post("/register", async (req, res) => {
       email: email.trim().toLowerCase(),
       avatar_url: avatar,
       bio: bio || "",
-      is_demo: false,
     };
     const token = generateToken(newUser);
 
@@ -108,8 +63,7 @@ router.post("/login", async (req, res) => {
       password_hash: string;
       avatar_url: string;
       bio: string;
-      is_demo?: number;
-    }>("SELECT id, name, email, password_hash, avatar_url, bio, is_demo FROM users WHERE LOWER(email) = LOWER(?)", [
+    }>("SELECT id, name, email, password_hash, avatar_url, bio FROM users WHERE LOWER(email) = LOWER(?)", [
       email.trim(),
     ]);
 
@@ -123,7 +77,6 @@ router.post("/login", async (req, res) => {
       email: user.email,
       avatar_url: user.avatar_url,
       bio: user.bio,
-      is_demo: Boolean(user.is_demo),
     };
 
     const token = generateToken(safeUser);
@@ -154,13 +107,13 @@ router.put("/profile", authenticateToken, async (req: AuthRequest, res: Response
       [name.trim(), avatar_url || null, bio || "", userId]
     );
 
-    const updatedUser = await queryOne<{ id: string; name: string; email: string; avatar_url: string; bio: string; is_demo?: number }>(
-      "SELECT id, name, email, avatar_url, bio, is_demo FROM users WHERE id = ?",
+    const updatedUser = await queryOne<{ id: string; name: string; email: string; avatar_url: string; bio: string }>(
+      "SELECT id, name, email, avatar_url, bio FROM users WHERE id = ?",
       [userId]
     );
 
     res.json({
-      user: updatedUser ? { ...updatedUser, is_demo: Boolean(updatedUser.is_demo) } : null,
+      user: updatedUser,
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -206,24 +159,24 @@ router.get("/search", authenticateToken, async (req: AuthRequest, res: Response)
     const currentUserId = req.user!.id;
 
     if (!query) {
-      const recentUsers = await queryAll<{ id: string; name: string; email: string; avatar_url: string; is_demo?: number }>(
-        "SELECT id, name, email, avatar_url, is_demo FROM users WHERE id != ? LIMIT 8",
+      const recentUsers = await queryAll<{ id: string; name: string; email: string; avatar_url: string }>(
+        "SELECT id, name, email, avatar_url FROM users WHERE id != ? LIMIT 8",
         [currentUserId]
       );
       return res.json({
-        users: recentUsers.map(u => ({ ...u, is_demo: Boolean(u.is_demo) }))
+        users: recentUsers
       });
     }
 
-    const users = await queryAll<{ id: string; name: string; email: string; avatar_url: string; is_demo?: number }>(
-      `SELECT id, name, email, avatar_url, is_demo FROM users 
-       WHERE id != ? AND (LOWER(name) LIKE ? OR LOWER(email) LIKE ?) 
+    const users = await queryAll<{ id: string; name: string; email: string; avatar_url: string }>(
+      `SELECT id, name, email, avatar_url FROM users
+       WHERE id != ? AND (LOWER(name) LIKE ? OR LOWER(email) LIKE ?)
        LIMIT 10`,
       [currentUserId, `%${query}%`, `%${query}%`]
     );
 
     res.json({
-      users: users.map(u => ({ ...u, is_demo: Boolean(u.is_demo) }))
+      users
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message });

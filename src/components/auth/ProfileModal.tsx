@@ -121,21 +121,10 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
               <div className="flex-1 min-w-0">
                 <div className="flex items-center space-x-2">
                   <p className="text-xs font-black uppercase text-black truncate">{name || user?.name}</p>
-                  {user?.is_demo ? (
-                    <span className="px-2 py-0.5 text-[9px] font-black uppercase tracking-wider bg-amber-300 text-black border border-black rounded shadow-[1px_1px_0px_0px_rgba(0,0,0,1)]">
-                      Demo Account
-                    </span>
-                  ) : (
-                    <span className="px-2 py-0.5 text-[9px] font-black uppercase tracking-wider bg-[#E0FF62] text-black border border-black rounded shadow-[1px_1px_0px_0px_rgba(0,0,0,1)]">
-                      Real Account
-                    </span>
-                  )}
                 </div>
                 <p className="text-[11px] text-black/70 font-medium truncate">{user?.email}</p>
                 <p className="text-[10px] text-black/50 mt-0.5 font-medium">
-                  {user?.is_demo
-                    ? "Shared demo sandbox profile for evaluating collaboration features."
-                    : "Your private, real user account with dedicated personal data."}
+                  Your private account with dedicated personal data.
                 </p>
               </div>
             </div>

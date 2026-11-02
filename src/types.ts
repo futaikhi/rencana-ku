@@ -11,7 +11,6 @@ export interface User {
   email: string;
   avatar_url?: string;
   bio?: string;
-  is_demo?: boolean;
 }
 
 export interface PlanMember {
@@ -23,7 +22,6 @@ export interface PlanMember {
   email?: string;
   avatar_url?: string;
   bio?: string;
-  is_demo?: boolean;
 }
 
 export interface PlanStats {
