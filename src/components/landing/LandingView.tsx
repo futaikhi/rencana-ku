@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { UserAvatar } from "../common/UserAvatar";
 import { BrandLogo } from "../common/BrandLogo";
-import { PWAInstallButton } from "../common/PWAInstallButton";
 import {
   Compass,
   CheckCircle2,
@@ -68,12 +67,10 @@ export const LandingView: React.FC<LandingViewProps> = () => {
       {/* Top Header / App Bar */}
       <header className="sticky top-0 z-30 bg-[#FAF8F5]/90 backdrop-blur-md border-b-2 border-black">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 sm:h-18 flex items-center justify-between">
-          <BrandLogo size="md" showTagline tagline="PWA • Mobile-First Planner" />
+          <BrandLogo size="md" showTagline tagline="Mobile-First Planner" />
 
           {/* Quick Actions */}
           <div className="flex items-center space-x-2">
-            <PWAInstallButton variant="pill" showAlways />
-
             <button
               type="button"
               onClick={() => {
@@ -196,10 +193,6 @@ export const LandingView: React.FC<LandingViewProps> = () => {
             </div>
           </div>
 
-          {/* In-App Install Callout Banner */}
-          <div className="pt-2">
-            <PWAInstallButton variant="banner" showAlways />
-          </div>
         </div>
 
         {/* Right Column: Direct Mobile-Optimized Auth Card */}

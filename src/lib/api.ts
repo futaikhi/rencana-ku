@@ -9,13 +9,8 @@ import {
   Activity,
   PlanMember,
 } from "../types";
-import { clientStore } from "./clientStore";
-import { syncService } from "./syncService";
 
 const TOKEN_KEY = "plancraft_token";
-const CURRENT_USER_ID_KEY = "plancraft_current_user_id";
-
-let isStaticMode: boolean | null = null;
 
 export function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY) || localStorage.getItem("rencanaku_token");
@@ -28,87 +23,35 @@ export function setToken(token: string) {
 export function removeToken() {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem("rencanaku_token");
-  localStorage.removeItem(CURRENT_USER_ID_KEY);
-}
-
-export function setCurrentUserId(userId: string) {
-  localStorage.setItem(CURRENT_USER_ID_KEY, userId);
-}
-
-export function getCurrentUserId(): string {
-  const stored = localStorage.getItem(CURRENT_USER_ID_KEY);
-  if (stored) return stored;
-  const token = getToken();
-  if (token && token.startsWith("local_")) {
-    const parts = token.split("_");
-    if (parts.length >= 3) {
-      return `${parts[1]}_${parts[2]}`;
-    }
-  }
-  return "user_one_01";
 }
 
 async function request<T>(
   endpoint: string,
-  options: RequestInit = {},
-  fallbackFn?: () => T | Promise<T>
+  options: RequestInit = {}
 ): Promise<T> {
-  if (isStaticMode && fallbackFn) {
-    return fallbackFn();
+  const token = getToken();
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...(options.headers as Record<string, string>),
+  };
+
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
   }
 
+  let response: Response;
   try {
-    const token = getToken();
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-      ...(options.headers as Record<string, string>),
-    };
-
-    if (token) {
-      headers["Authorization"] = `Bearer ${token}`;
-    }
-
-    const res = await fetch(endpoint, {
-      ...options,
-      headers,
-    });
-
-    const contentType = res.headers.get("content-type") || "";
-    // If on a static host like Cloudflare Pages / Netlify and the API route was rewritten to index.html
-    if (contentType.includes("text/html") || res.status === 404) {
-      if (fallbackFn) {
-        isStaticMode = true;
-        return fallbackFn();
-      }
-    }
-
-    const data = await res.json().catch(() => ({}));
-
-    if (!res.ok) {
-      // If unauthorized or bad request from a real backend, propagate error
-      if (res.status === 401 || res.status === 400 || res.status === 403) {
-        throw new Error(data.error || `HTTP Error ${res.status}`);
-      }
-      if (fallbackFn) {
-        isStaticMode = true;
-        return fallbackFn();
-      }
-      throw new Error(data.error || `HTTP Error ${res.status}`);
-    }
-
-    return data as T;
-  } catch (err: any) {
-    // If network failed (e.g. device offline, timeout, or backend temporarily unreachable)
-    if (
-      fallbackFn &&
-      (err.message?.includes("Failed to fetch") ||
-        err.message?.includes("NetworkError") ||
-        err.name === "TypeError")
-    ) {
-      return fallbackFn();
-    }
-    throw err;
+    response = await fetch(endpoint, { ...options, headers });
+  } catch {
+    throw new Error("A network connection is required to use PlanCraft.");
   }
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data.error || `HTTP Error ${response.status}`);
+  }
+
+  return data as T;
 }
 
 export const api = {
@@ -119,11 +62,8 @@ export const api = {
       {
         method: "POST",
         body: JSON.stringify({ email, password }),
-      },
-      () => clientStore.login(email, password)
-    );
+      });
     setToken(res.token);
-    setCurrentUserId(res.user.id);
     return res;
   },
 
@@ -139,20 +79,15 @@ export const api = {
       {
         method: "POST",
         body: JSON.stringify(data),
-      },
-      () => clientStore.register(data)
-    );
+      });
     setToken(res.token);
-    setCurrentUserId(res.user.id);
     return res;
   },
 
   async getCurrentUser(): Promise<{ user: User }> {
     return request<{ user: User }>(
       "/api/auth/me",
-      {},
-      () => clientStore.getCurrentUser(getCurrentUserId())
-    );
+      {});
   },
 
   async updateProfile(data: { name: string; bio?: string; avatar_url?: string }): Promise<{ user: User }> {
@@ -161,9 +96,7 @@ export const api = {
       {
         method: "PUT",
         body: JSON.stringify(data),
-      },
-      () => clientStore.updateProfile(getCurrentUserId(), data)
-    );
+      });
   },
 
   async changePassword(currentPassword: string, newPassword: string): Promise<{ message: string }> {
@@ -172,17 +105,13 @@ export const api = {
       {
         method: "PUT",
         body: JSON.stringify({ currentPassword, newPassword }),
-      },
-      () => ({ message: "Password updated successfully" })
-    );
+      });
   },
 
   async searchUsers(query: string): Promise<{ users: User[] }> {
     return request<{ users: User[] }>(
       `/api/auth/search?q=${encodeURIComponent(query)}`,
-      {},
-      () => clientStore.searchUsers(query, getCurrentUserId())
-    );
+      {});
   },
 
   // Plans
@@ -195,9 +124,7 @@ export const api = {
   }> {
     return request(
       "/api/plans",
-      {},
-      () => clientStore.getPlans(getCurrentUserId())
-    );
+      {});
   },
 
   async createPlan(data: {
@@ -215,25 +142,13 @@ export const api = {
       {
         method: "POST",
         body: JSON.stringify(data),
-      },
-      () => {
-        const res = clientStore.createPlan(getCurrentUserId(), data);
-        syncService.enqueueMutation({
-          type: "CREATE_PLAN",
-          entityId: res.plan.id,
-          payload: { ...res.plan },
-        });
-        return res;
-      }
-    );
+      });
   },
 
   async getPlanDetail(id: string): Promise<PlanDetailResponse> {
     return request<PlanDetailResponse>(
       `/api/plans/${id}`,
-      {},
-      () => clientStore.getPlanDetail(getCurrentUserId(), id)
-    );
+      {});
   },
 
   async updatePlan(id: string, data: Partial<Plan>): Promise<{ plan: Plan }> {
@@ -242,18 +157,7 @@ export const api = {
       {
         method: "PUT",
         body: JSON.stringify(data),
-      },
-      () => {
-        const res = clientStore.updatePlan(id, data);
-        syncService.enqueueMutation({
-          type: "UPDATE_PLAN",
-          entityId: id,
-          planId: id,
-          payload: data,
-        });
-        return res;
-      }
-    );
+      });
   },
 
   async deletePlan(id: string): Promise<{ message: string }> {
@@ -261,18 +165,7 @@ export const api = {
       `/api/plans/${id}`,
       {
         method: "DELETE",
-      },
-      () => {
-        const res = clientStore.deletePlan(id);
-        syncService.enqueueMutation({
-          type: "DELETE_PLAN",
-          entityId: id,
-          planId: id,
-          payload: {},
-        });
-        return res;
-      }
-    );
+      });
   },
 
   async leavePlan(id: string): Promise<{ message: string }> {
@@ -280,9 +173,7 @@ export const api = {
       `/api/plans/${id}/leave`,
       {
         method: "POST",
-      },
-      () => clientStore.removeMember(getCurrentUserId())
-    );
+      });
   },
 
   // Tasks
@@ -292,18 +183,7 @@ export const api = {
       {
         method: "POST",
         body: JSON.stringify(data),
-      },
-      () => {
-        const res = clientStore.createTask(getCurrentUserId(), planId, data);
-        syncService.enqueueMutation({
-          type: "CREATE_TASK",
-          entityId: res.task.id,
-          planId,
-          payload: { ...res.task, plan_id: planId },
-        });
-        return res;
-      }
-    );
+      });
   },
 
   async updateTask(planId: string, taskId: string, data: Partial<Task>): Promise<{ task: Task }> {
@@ -312,18 +192,7 @@ export const api = {
       {
         method: "PUT",
         body: JSON.stringify(data),
-      },
-      () => {
-        const res = clientStore.updateTask(planId, taskId, data);
-        syncService.enqueueMutation({
-          type: "UPDATE_TASK",
-          entityId: taskId,
-          planId,
-          payload: { ...data, plan_id: planId },
-        });
-        return res;
-      }
-    );
+      });
   },
 
   async toggleTask(planId: string, taskId: string): Promise<{ task: Task }> {
@@ -331,18 +200,7 @@ export const api = {
       `/api/plans/${planId}/tasks/${taskId}/toggle`,
       {
         method: "PATCH",
-      },
-      () => {
-        const res = clientStore.toggleTask(planId, taskId);
-        syncService.enqueueMutation({
-          type: "TOGGLE_TASK",
-          entityId: taskId,
-          planId,
-          payload: { status: res.task.status, plan_id: planId },
-        });
-        return res;
-      }
-    );
+      });
   },
 
   async deleteTask(planId: string, taskId: string): Promise<{ message: string }> {
@@ -350,18 +208,7 @@ export const api = {
       `/api/plans/${planId}/tasks/${taskId}`,
       {
         method: "DELETE",
-      },
-      () => {
-        const res = clientStore.deleteTask(planId, taskId);
-        syncService.enqueueMutation({
-          type: "DELETE_TASK",
-          entityId: taskId,
-          planId,
-          payload: {},
-        });
-        return res;
-      }
-    );
+      });
   },
 
   // Milestones
@@ -371,18 +218,7 @@ export const api = {
       {
         method: "POST",
         body: JSON.stringify(data),
-      },
-      () => {
-        const res = clientStore.createMilestone(planId, data);
-        syncService.enqueueMutation({
-          type: "CREATE_MILESTONE",
-          entityId: res.milestone.id,
-          planId,
-          payload: { ...res.milestone, plan_id: planId },
-        });
-        return res;
-      }
-    );
+      });
   },
 
   async updateMilestone(planId: string, milestoneId: string, data: Partial<Milestone>): Promise<{ milestone: Milestone }> {
@@ -391,18 +227,7 @@ export const api = {
       {
         method: "PUT",
         body: JSON.stringify(data),
-      },
-      () => {
-        const res = clientStore.updateMilestone(milestoneId, data);
-        syncService.enqueueMutation({
-          type: "UPDATE_MILESTONE",
-          entityId: milestoneId,
-          planId,
-          payload: { ...data, plan_id: planId },
-        });
-        return res;
-      }
-    );
+      });
   },
 
   async toggleMilestone(planId: string, milestoneId: string): Promise<{ milestone: Milestone }> {
@@ -410,18 +235,7 @@ export const api = {
       `/api/plans/${planId}/milestones/${milestoneId}/toggle`,
       {
         method: "PATCH",
-      },
-      () => {
-        const res = clientStore.toggleMilestone(milestoneId);
-        syncService.enqueueMutation({
-          type: "TOGGLE_MILESTONE",
-          entityId: milestoneId,
-          planId,
-          payload: { status: res.milestone.status, plan_id: planId },
-        });
-        return res;
-      }
-    );
+      });
   },
 
   async deleteMilestone(planId: string, milestoneId: string): Promise<{ message: string }> {
@@ -429,18 +243,7 @@ export const api = {
       `/api/plans/${planId}/milestones/${milestoneId}`,
       {
         method: "DELETE",
-      },
-      () => {
-        const res = clientStore.deleteMilestone(milestoneId);
-        syncService.enqueueMutation({
-          type: "DELETE_MILESTONE",
-          entityId: milestoneId,
-          planId,
-          payload: {},
-        });
-        return res;
-      }
-    );
+      });
   },
 
   // Budget
@@ -450,18 +253,7 @@ export const api = {
       {
         method: "POST",
         body: JSON.stringify(data),
-      },
-      () => {
-        const res = clientStore.createBudgetItem(planId, data);
-        syncService.enqueueMutation({
-          type: "CREATE_BUDGET_ITEM",
-          entityId: res.item.id,
-          planId,
-          payload: { ...res.item, plan_id: planId },
-        });
-        return res;
-      }
-    );
+      });
   },
 
   async updateBudgetItem(planId: string, itemId: string, data: Partial<BudgetItem>): Promise<{ item: BudgetItem }> {
@@ -470,18 +262,7 @@ export const api = {
       {
         method: "PUT",
         body: JSON.stringify(data),
-      },
-      () => {
-        const res = clientStore.updateBudgetItem(planId, itemId, data);
-        syncService.enqueueMutation({
-          type: "UPDATE_BUDGET_ITEM",
-          entityId: itemId,
-          planId,
-          payload: { ...data, plan_id: planId },
-        });
-        return res;
-      }
-    );
+      });
   },
 
   async deleteBudgetItem(planId: string, itemId: string): Promise<{ message: string }> {
@@ -489,18 +270,7 @@ export const api = {
       `/api/plans/${planId}/budget-items/${itemId}`,
       {
         method: "DELETE",
-      },
-      () => {
-        const res = clientStore.deleteBudgetItem(planId, itemId);
-        syncService.enqueueMutation({
-          type: "DELETE_BUDGET_ITEM",
-          entityId: itemId,
-          planId,
-          payload: {},
-        });
-        return res;
-      }
-    );
+      });
   },
 
   // Notes
@@ -510,18 +280,7 @@ export const api = {
       {
         method: "PUT",
         body: JSON.stringify({ notes }),
-      },
-      () => {
-        const res = clientStore.updateNotes(planId, notes);
-        syncService.enqueueMutation({
-          type: "UPDATE_NOTES",
-          entityId: planId,
-          planId,
-          payload: { notes },
-        });
-        return res;
-      }
-    );
+      });
   },
 
   // Members
@@ -531,9 +290,7 @@ export const api = {
       {
         method: "PUT",
         body: JSON.stringify({ role }),
-      },
-      () => clientStore.updateMemberRole(memberId, role)
-    );
+      });
   },
 
   async removeMember(planId: string, memberId: string): Promise<{ message: string }> {
@@ -541,18 +298,14 @@ export const api = {
       `/api/plans/${planId}/members/${memberId}`,
       {
         method: "DELETE",
-      },
-      () => clientStore.removeMember(memberId)
-    );
+      });
   },
 
   // Invitations
   async getInvitations(): Promise<{ invitations: PlanInvitation[] }> {
     return request<{ invitations: PlanInvitation[] }>(
       "/api/invitations",
-      {},
-      () => clientStore.getInvitations(getCurrentUserId())
-    );
+      {});
   },
 
   async sendInvitation(planId: string, data: { email?: string; userId?: string; role: string }): Promise<{ invitation: PlanInvitation; message: string }> {
@@ -561,9 +314,7 @@ export const api = {
       {
         method: "POST",
         body: JSON.stringify(data),
-      },
-      () => clientStore.sendInvitation(getCurrentUserId(), planId, data)
-    );
+      });
   },
 
   async respondToInvitation(inviteId: string, action: "ACCEPT" | "DECLINE"): Promise<{ message: string; planId?: string }> {
@@ -572,9 +323,7 @@ export const api = {
       {
         method: "POST",
         body: JSON.stringify({ action }),
-      },
-      () => clientStore.respondToInvitation(getCurrentUserId(), inviteId, action)
-    );
+      });
   },
 
   async cancelInvitation(inviteId: string): Promise<{ message: string }> {
@@ -582,17 +331,13 @@ export const api = {
       `/api/invitations/${inviteId}`,
       {
         method: "DELETE",
-      },
-      () => clientStore.cancelInvitation(inviteId)
-    );
+      });
   },
 
   // Activity Feed
   async getActivityFeed(): Promise<{ activities: Activity[] }> {
     return request<{ activities: Activity[] }>(
       "/api/activity/feed",
-      {},
-      () => clientStore.getActivityFeed(getCurrentUserId())
-    );
+      {});
   },
 };

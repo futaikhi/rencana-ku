@@ -4,7 +4,6 @@ import { useToast } from "../../context/ToastContext";
 import { UserAvatar } from "../common/UserAvatar";
 import { BrandLogo } from "../common/BrandLogo";
 import { PWAInstallButton } from "../common/PWAInstallButton";
-import { SyncButton } from "../common/SyncButton";
 import {
   Plus,
   Bell,
@@ -85,13 +84,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   <span>New Plan</span>
                 </button>
 
-                {/* Manual Sync Button */}
-                <SyncButton variant="pill" showLastSync className="hidden md:inline-flex" />
-                <SyncButton variant="compact" className="inline-flex md:hidden" />
-
-                {/* PWA Install Button */}
-                <PWAInstallButton variant="pill" className="hidden lg:flex" />
-                <PWAInstallButton variant="compact" className="hidden sm:flex lg:hidden" />
+                <PWAInstallButton variant="compact" className="hidden sm:flex" />
 
                 {/* User Profile Pill & Dropdown */}
                 <div className="relative">
@@ -130,18 +123,6 @@ export const Navbar: React.FC<NavbarProps> = ({
 
                       <div className="border-t border-black/20 my-1" />
 
-                      {/* In-Menu Sync Option */}
-                      <div className="px-3 py-1.5 flex items-center justify-between">
-                        <SyncButton variant="minimal" className="w-full justify-between" />
-                      </div>
-
-                      <div className="border-t border-black/20 my-1" />
-
-                      {/* In-Menu PWA Install */}
-                      <div className="py-1">
-                        <PWAInstallButton variant="banner" showAlways />
-                      </div>
-
                       <div className="border-t border-black/20 my-1" />
 
                       <button
@@ -162,7 +143,6 @@ export const Navbar: React.FC<NavbarProps> = ({
               </>
             ) : (
               <div className="flex items-center space-x-2">
-                <PWAInstallButton variant="pill" showAlways />
                 <button
                   type="button"
                   onClick={onOpenAuth}
